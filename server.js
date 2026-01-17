@@ -27,7 +27,7 @@ async function enviarTelegram(msg, comBotao = true) {
     };
     if (comBotao) {
         payload.reply_markup = {
-            inline_keyboard: [[{ text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }]]
+            inline_keyboard: { text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }
         };
     }
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
@@ -57,11 +57,11 @@ setInterval(() => {
         if (segs === 50) {
             d.direcao = Math.random() > 0.5 ? "🟢 CALL" : "🔴 PUT";
             d.gatilho = true;
-            enviarTelegram(`⚠️ *ATENÇÃO ANALISANDO ENTRADA*\n💎 Ativo: ${ativo}\n📈 Direção: ${d.direcao}\n📊 *ATUAL:* ${d.wins}W - ${d.loss}L\n🌍 *GLOBAL:* ${global.wins}W - ${global.loss}L\n✅ *GALE:* G1: ${d.g1} | G2: ${d.g2}\n⚡ *ASSERTIVIDADE:* ${calcEficiencia(ativo)}%`);
+            enviarTelegram(`⚠️ *ATENÇÃO ANALISANDO ENTRADA*\n\n💎 Ativo: ${ativo}\n📈 Direção: ${d.direcao}\n\n📊 *ATUAL:* ${d.wins}W - ${d.loss}L\n🌍 *GLOBAL:* ${global.wins}W - ${global.loss}L\n✅ *GALE:* G1: ${d.g1} | G2: ${d.g2}\n⚡ *ASSERTIVIDADE:* ${calcEficiencia(ativo)}%`);
         }
 
         if (segs === 0 && d.gatilho) {
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n 👉CLIQUE AGORA*\n💎 Ativo: ${ativo}\n🎯 Sinal: ${d.direcao}\n🔥 *EFICIÊNCIA ROBO:* ${efGlobal}%`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA - CLIQUE AGORA*\n\n💎 Ativo: ${ativo}\n🎯 Sinal: ${d.direcao}\n📉 Taxa: Retração 30%\n🏆 *RANKING ATIVOS:*\n${obterRank()}\n\n🔥 *EFICIÊNCIA ROBO:* ${efGlobal}%`);
             d.gatilho = false;
             simularResultado(ativo, d.direcao);
         }
