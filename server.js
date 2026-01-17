@@ -15,7 +15,7 @@ let ativosSelecionados = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD"];
 let global = { analises: 0, wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0 };
 let dadosAtivos = {};
 listaAtivos.forEach(a => {
-    dadosAtivos[a] = { wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0, gatilho: false, direcao: "" };
+    dadosAtivos[a] = { wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0, gatilho: false, direcao: "", ultimoMinuto: -1 };
 });
 
 async function enviarTelegram(msg, comBotao = true) {
@@ -23,7 +23,7 @@ async function enviarTelegram(msg, comBotao = true) {
     if (comBotao) {
         payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR AGORA", url: LINK_IQ }]] };
     }
-    try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) { console.log("Erro Telegram"); }
+    try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
 function calcEficiencia(nome) {
@@ -70,25 +70,31 @@ function verificarResultadoFinal(ativo, direcao) {
                             d.redGale++; global.redGale++;
                             enviarTelegram(gerarRelatorioGrande(ativo, "❌ RED NO G2"), false);
                         }
-                    }, 5000); // Teste rápido de 5s para Gale
+                    }, 60000); // Voltei para 60s
                 }
-            }, 5000); // Teste rápido de 5s para Gale
+            }, 60000);
         }
-    }, 5000); // Teste rápido de 5s para Resultado
+    }, 60000);
 }
 
+// CICLO COM TRAVA DE MINUTO PARA EVITAR DUPLICIDADE
 setInterval(() => {
-    const segs = new Date().getSeconds();
-    
+    const agora = new Date();
+    const segs = agora.getSeconds();
+    const minAtual = agora.getMinutes();
+
     ativosSelecionados.forEach(ativo => {
         const d = dadosAtivos[ativo];
-        if (!d) return;
 
-        if (segs === 50 && !d.gatilho) {
+        // Se já processamos este ativo NESTE MINUTO, não faz nada
+        if (d.ultimoMinuto === minAtual) return;
+
+        if (segs === 50) {
             d.direcao = Math.random() > 0.5 ? "🟢 CALL" : "🔴 PUT";
             d.gatilho = true;
             global.analises++;
             enviarTelegram(`⚠️ *ANALISANDO:* ${ativo}\n🎯 *SINAL:* ${d.direcao}\n\n\`📊 ATIVO: ${d.wins}W-${d.loss}L\``);
+            d.ultimoMinuto = minAtual; // TRAVA O MINUTO
         }
 
         if (segs === 0 && d.gatilho) {
@@ -101,8 +107,7 @@ setInterval(() => {
 
 app.get('/lista-ativos', (req, res) => res.json(listaAtivos));
 app.post('/selecionar-ativo', (req, res) => {
-    const { index, ativo } = req.body;
-    ativosSelecionados[index] = ativo;
+    ativosSelecionados[req.body.index] = req.body.ativo;
     res.json({ status: "ok" });
 });
 app.get('/dados', (req, res) => {
@@ -115,4 +120,4 @@ app.get('/dados', (req, res) => {
     res.json(resp);
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("Servidor Online"));
+app.listen(process.env.PORT || 3000);
