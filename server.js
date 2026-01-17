@@ -27,7 +27,7 @@ async function enviarTelegram(msg, comBotao = true) {
     };
     if (comBotao) {
         payload.reply_markup = {
-            inline_keyboard: { text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }
+            inline_keyboard: [[{ text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }]]
         };
     }
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
