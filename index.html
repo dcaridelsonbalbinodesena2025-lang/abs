@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K.C.M IQ OPTION V19 - ESTRATÉGIA REAL</title>
+    <title>K.C.M IQ OPTION V19 - CONTROLE MESTRE</title>
     <style>
         :root { 
             --neon-blue: #1e90ff; --neon-green: #00ff88; --neon-red: #ff3355; 
@@ -22,7 +22,7 @@
         .thermometer-fill { height: 100%; width: 50%; transition: 0.4s; background: linear-gradient(90deg, #ff3355, #f0b90b, #00ff88); }
         .status-box { width: 100%; height: 40px; background: #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid #333; text-align: center; }
         .timer-large { font-size: 38px; font-weight: bold; text-align: center; color: #fff; margin: 5px 0; }
-        .select-ativo { background: #0d0f12; color: #fff; border: 1px solid #444; font-size: 11px; width: 100%; padding: 6px; margin-top: 10px; border-radius: 5px; }
+        .select-ativo { background: #0d0f12; color: #fff; border: 1px solid var(--royal-blue); font-size: 12px; width: 100%; padding: 8px; margin-top: 10px; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -38,106 +38,63 @@
     <div class="grid-container" id="grid"></div>
 
 <script>
-    const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI"; 
-    const TG_CHAT_ID = "-1003355965894"; 
-    const LINK_CORRETORA = "https://fwd.cx/m8xU812pB87p"; 
-
-    let statsGerais = { analises: 0, wins: 0, loss: 0 };
-    let gatilhoAtivo = {}; // Para controlar se a força bateu 70%
-
-    function enviarTelegram(msg, comBotao = true) {
-        let payload = { chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown" };
-        if (comBotao) {
-            payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR NA IQ OPTION", url: LINK_CORRETORA }]] };
-        }
-        fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+    // BUSCA A LISTA COMPLETA DO SERVIDOR
+    async function carregarOpcoes(selectElement) {
+        try {
+            const res = await fetch('/lista-ativos');
+            const lista = await res.json();
+            selectElement.innerHTML = ''; // Limpa
+            lista.forEach(ativo => {
+                let opt = document.createElement('option');
+                opt.value = ativo;
+                opt.innerText = ativo;
+                selectElement.appendChild(opt);
+            });
+        } catch (e) { console.error("Erro ao carregar lista"); }
     }
 
-    // RELATÓRIO GLOBAL A CADA 5 MINUTOS
-    setInterval(() => {
-        let msg = `📊 *PLACAR GLOBAL KCM*\n\n`;
-        msg += `🎯 Estratégia: Força 70% + Retração\n`;
-        msg += `✅ Wins: ${statsGerais.wins}\n`;
-        msg += `❌ Losses: ${statsGerais.loss}\n`;
-        msg += `📈 Eficiência: ${document.getElementById('g-perc').innerText}`;
-        enviarTelegram(msg, false);
-    }, 300000);
+    // AVISA O SERVIDOR QUE VOCÊ MUDOU O ATIVO
+    async function mudarAtivo(index, ativo) {
+        await fetch('/selecionar-ativo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index, ativo })
+        });
+    }
 
     function criarCards() {
         const grid = document.getElementById('grid');
-        const ativos = ['EURUSD-OTC', 'GBPUSD-OTC', 'USDJPY-OTC', 'AUDUSD-OTC'];
-        ativos.forEach((ativo, i) => {
-            const id = `card${i}`;
-            gatilhoAtivo[id] = false;
+        for (let i = 0; i < 4; i++) {
             grid.innerHTML += `
                 <div class="card">
                     <div class="stat-label">FORÇA DO MERCADO</div>
-                    <div class="thermometer-wrap"><div class="thermometer-fill" id="therm-${id}"></div></div>
-                    <div class="status-box"><div id="status-${id}" style="font-size:9px; font-weight:bold; color:#888;">ANALISANDO...</div></div>
-                    <div class="timer-large" id="timer-${id}">00</div>
-                    <select class="select-ativo" id="select-${id}">${ativo}</select>
+                    <div class="thermometer-wrap"><div class="thermometer-fill" id="therm-${i}"></div></div>
+                    <div class="status-box"><div id="status-${i}" style="font-size:9px; font-weight:bold; color:#888;">ANALISANDO...</div></div>
+                    <div class="timer-large" id="timer-${i}">00</div>
+                    <select class="select-ativo" id="select-${i}" onchange="mudarAtivo(${i}, this.value)">
+                        <option>Carregando...</option>
+                    </select>
                 </div>`;
-            iniciarAnalise(id);
-        });
+            const sel = document.getElementById(`select-${i}`);
+            carregarOpcoes(sel);
+            iniciarInterface(i);
+        }
     }
 
-    function iniciarAnalise(id) {
-        setInterval(() => {
+    function iniciarInterface(i) {
+        setInterval(async () => {
             let segs = new Date().getSeconds();
-            let displayTimer = document.getElementById(`timer-${id}`);
-            let displayStatus = document.getElementById(`status-${id}`);
-            let displayForca = document.getElementById(`therm-${id}`);
+            document.getElementById(`timer-${i}`).innerText = (60 - segs).toString().padStart(2, '0');
             
-            displayTimer.innerText = (60 - segs).toString().padStart(2, '0');
-
-            // Simulação de Força baseada em volatilidade real
-            let forcaAtual = Math.floor(Math.random() * 100);
-            displayForca.style.width = forcaAtual + "%";
-
-            // GATILHO 1: FORÇA 70% (Aos 50 segundos)
-            if (segs === 50) {
-                if (forcaAtual >= 70) {
-                    gatilhoAtivo[id] = true;
-                    let ativoNome = document.getElementById(`select-${id}`).innerText || "Ativo";
-                    enviarTelegram(`🔍 *BUSCANDO TAXA...*\n📊 Ativo: ${ativoNome}\n⚡ Força: ${forcaAtual}% (Gatilho 1 OK)`, false);
-                    displayStatus.innerText = "GATILHO 1: FORÇA 70%";
-                    displayStatus.style.color = "#1e90ff";
-                } else {
-                    gatilhoAtivo[id] = false;
-                    displayStatus.innerText = "AGUARDANDO FORÇA...";
-                    displayStatus.style.color = "#888";
-                }
-            }
-
-            // GATILHO 2: RETRAÇÃO 30% (No segundo 00)
-            if (segs === 0 && gatilhoAtivo[id]) {
-                // Simula se houve a retração de 30% após o pico de força
-                let confirmouRetracao = Math.random() > 0.3; 
-
-                if (confirmouRetracao) {
-                    let direcao = Math.random() > 0.5 ? "CALL 🟢" : "PUT 🔴";
-                    let ativoNome = document.getElementById(`select-${id}`).innerText || "Ativo";
-                    enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${ativoNome}\n📉 Padrão: Retração 30% (Gatilho 2 OK)\n📈 Direção: ${direcao}\n⏰ Expiração: 1 MINUTO`);
-                    
-                    statsGerais.analises++;
-                    if(Math.random() > 0.4) { statsGerais.wins++; } else { statsGerais.loss++; }
-                    atualizarPlacar();
-                }
-                gatilhoAtivo[id] = false; // Reseta para a próxima vela
-                setTimeout(() => { displayStatus.innerText = "ANALISANDO..."; displayStatus.style.color = "#888"; }, 3000);
+            // Sincroniza placares globais e força vindo do servidor
+            const res = await fetch('/dados');
+            const dados = await res.json();
+            if (dados[i]) {
+                document.getElementById(`therm-${i}`).style.width = dados[i].forca + "%";
+                document.getElementById('g-wins').innerText = dados.reduce((a, b) => a + b.wins, 0);
+                document.getElementById('g-loss').innerText = dados.reduce((a, b) => a + b.loss, 0);
             }
         }, 1000);
-    }
-
-    function atualizarPlacar() {
-        document.getElementById('g-analises').innerText = statsGerais.analises;
-        document.getElementById('g-wins').innerText = statsGerais.wins;
-        document.getElementById('g-loss').innerText = statsGerais.loss;
-        let perc = ((statsGerais.wins / (statsGerais.analises || 1)) * 100).toFixed(1);
-        document.getElementById('g-perc').innerText = perc + "%";
     }
 
     window.onload = criarCards;
