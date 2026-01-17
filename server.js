@@ -5,26 +5,6 @@ const app = express();
 
 // --- PARTE PARA O PAINEL VISUAL VOLTAR ---
 app.use(express.static(path.join(__dirname, '.')));
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// AQUI É O QUE RESOLVE O ERRO DE "PORT" DO RENDER
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
-
-// --- CONFIGURAÇÕES DO TELEGRAM ---
-const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
-const TG_CHAT_ID = "-1003355965894";
-const LINK_CORRETORA = "https://fwd.cx/m8xU812pB87p";
-
-let statsGlobal = { wins: 0, loss: 0 };
-const ativosData = {};
-const listaAtivos = [
-    "EUR/USD", "GBP/USD", "USD/CAD", "EUR/GBP", "USD/JPY", "AUD/USD",
-    "EUR/USD-OTC", "GBP/USD-OTC", "USD/JPY-OTC", "USD/CHF-OTC", 
-    "EUR/JPY-OTC", "GBP/JPY-OTC", "AUD/USD-OTC", "BTC/USD-OTC"
-];
 
 listaAtivos.forEach(a => ativosData[a] = { wins: 0, loss: 0 });
 
