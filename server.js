@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
-// FAZ O INDEX.HTML APARECER NO LINK DO RENDER
+// FAZ O PAINEL (INDEX.HTML) APARECER NO LINK DO RENDER
 app.use(express.static(path.join(__dirname, '.')));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
