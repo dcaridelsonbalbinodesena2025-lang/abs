@@ -73,7 +73,7 @@ function processarTick(id, preco) {
     if (segs >= 5 && segs < 10 && !m.analiseEnviada && !m.operacaoAtiva && !m.abortadoNestaVela) {
         const proxM = new Date(agoraBR.getTime() + (60 - segs) * 1000);
         const horaE = proxM.getHours().toString().padStart(2, '0') + ":" + proxM.getMinutes().toString().padStart(2, '0');
-        enviarTelegram(`🔍 *ANALISANDO ENTRADA*\n💎 Ativo: ${m.nome}\n⏰ Possível entrada: *${horaE}:00*\n⏳ _Aguardando gatilho de 70% + retração..._`);
+        enviarTelegram(`🔍 *ANALISANDO ENTRADA*\n💎 Ativo: ${m.nome}\n⏰ Possível entrada: *${horaE}:00*\n⏳ _Aguardando a confirmação..._`);
         m.analiseEnviada = true;
     }
 
