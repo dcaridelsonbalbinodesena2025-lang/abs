@@ -62,6 +62,7 @@ const LISTA_ATIVOS = [
     { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
 ];
 
+
 let statsDia = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
 let statsSemana = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
 let motores = {};
@@ -110,8 +111,11 @@ function registrarResultado(id, win, gale) {
 function processarTick(id, preco) {
     const m = motores[id]; if (!m) return;
     m.precoAtual = preco;
-    const agora = new Date();
-    const segs = agora.getSeconds();
+    
+    // --- SINCRONIZAÇÃO COM HORÁRIO DE BRASÍLIA ---
+    const agoraUTC = new Date();
+    const agoraBR = new Date(agoraUTC.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    const segs = agoraBR.getSeconds();
     const direcaoTxt = (s) => s === "CALL" ? "🟢 COMPRA" : "🔴 VENDA";
 
     if (m.aberturaVela > 0) {
@@ -119,69 +123,63 @@ function processarTick(id, preco) {
         m.forca = Math.min(98, Math.max(2, m.forca));
     }
 
-    // --- LÓGICA DE PRÉ-ALERTA (ANALISANDO) ---
+    // --- ANALISANDO TAXA (ALERTA PRÉVIO AOS 45s) ---
     if (segs >= 45 && segs <= 50 && !m.analiseEnviada && !m.operacaoAtiva) {
         let sinalPrevia = m.forca >= 65 ? "CALL" : m.forca <= 35 ? "PUT" : null;
         if (sinalPrevia) {
-            const proxMinuto = new Date(agora.getTime() + 60000);
+            const proxMinuto = new Date(agoraBR.getTime() + 60000);
             const horaEntrada = proxMinuto.getHours().toString().padStart(2, '0') + ":" + proxMinuto.getMinutes().toString().padStart(2, '0');
-            enviarTelegram(`🔍 *ANALISANDO ATIVO*\n💎 Ativo: ${m.nome}\n⏰ Possível entrada: *${horaEntrada}:00*\n⚠️ _Aguarde a confirmação..._`, false);
+            enviarTelegram(`🔍 *ANALISANDO ATIVO*\n💎 Ativo: ${m.nome}\n⏰ Possível entrada: *${horaEntrada}:00*\n⏳ _Aguardando taxa de segurança..._`, false);
             m.analiseEnviada = true;
         }
     }
 
-    // --- LÓGICA DE CONFIRMAÇÃO OU ABORTO (00 SEGUNDOS) ---
+    // --- CONFIRMAÇÃO OU ABORTO (00 SEGUNDOS) ---
     if (segs === 0 && m.aberturaVela !== preco) {
         m.aberturaVela = preco;
         let sinalFinal = m.forca >= 70 ? "CALL" : m.forca <= 30 ? "PUT" : null;
 
         if (sinalFinal && !m.operacaoAtiva) {
             m.operacaoAtiva = sinalFinal; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
+            enviarTelegram(`🚀 *TAXA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
         } 
         else if (m.analiseEnviada && !sinalFinal && !m.operacaoAtiva) {
-            enviarTelegram(`❌ *ENTRADA ABORTADA*\nO sinal em ${m.nome} não confirmou a força necessária.`, false);
+            enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA*\nO ativo ${m.nome} não buscou a taxa de segurança. Não entre!`, false);
         }
-        m.analiseEnviada = false; // Reseta para a próxima vela
+        m.analiseEnviada = false;
     }
 
-    // --- LÓGICA DE RESULTADO E GALE ---
+    // --- PROCESSAMENTO DE RESULTADO E GALE ---
     if (m.tempoOp > 0) {
         m.tempoOp--;
         if (m.tempoOp <= 0) {
             const win = (m.operacaoAtiva === "CALL" && preco > m.precoEntrada) || (m.operacaoAtiva === "PUT" && preco < m.precoEntrada);
-            const dir = m.operacaoAtiva;
-
             if (win) {
                 registrarResultado(id, true, m.galeAtual);
-                enviarTelegram(`✅ *WIN: ${m.nome}*${gerarPlacarMsg(id)}`, true);
+                enviarTelegram(`✅ *GREEN: ${m.nome}*${gerarPlacarMsg(id)}`, true); // Link só no GREEN
                 m.operacaoAtiva = null; m.galeAtual = 0;
             } else if (m.galeAtual < 2) {
                 m.galeAtual++; m.precoEntrada = preco; m.tempoOp = 60;
-                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*\n🎯 *Sinal:* ${direcaoTxt(dir)}${gerarPlacarMsg(id)}`, false);
+                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*\n🎯 *Sinal:* ${direcaoTxt(m.operacaoAtiva)}${gerarPlacarMsg(id)}`, false);
             } else {
                 registrarResultado(id, false, m.galeAtual);
-                enviarTelegram(`❌ *RED: ${m.nome}*${gerarPlacarMsg(id)}`, false);
+                enviarTelegram(`❌ *LOSS: ${m.nome}*${gerarPlacarMsg(id)}`, false);
                 m.operacaoAtiva = null; m.galeAtual = 0;
             }
         }
     }
 }
 
-// Relatórios e Resets
+// Relatórios Automáticos (5 em 5 minutos)
 setInterval(() => {
     if (statsDia.analises === 0) return;
     const hoje = ["DOMINGO", "SEGUNDA-FEIRA", "TERÇA-FEIRA", "QUARTA-FEIRA", "QUINTA-FEIRA", "SEXTA-FEIRA", "SÁBADO"][new Date().getDay()];
-    enviarTelegram(`📊 *BALANÇO DIÁRIO - ${hoje}*\n\n📈 Análises: ${statsDia.analises}\n✅ Win Direto: ${statsDia.winDireto}\n🔄 Win Gale: ${statsDia.winGales}\n❌ Loss: ${statsDia.loss}\n\n🔥 EFICIÊNCIA: ${(((statsDia.winDireto+statsDia.winGales)/statsDia.analises)*100).toFixed(1)}%`, false);
+    enviarTelegram(`📊 *BALANÇO DIÁRIO - ${hoje}*\n📈 Análises: ${statsDia.analises}\n✅ Win Direto: ${statsDia.winDireto}\n🔄 Win Gale: ${statsDia.winGales}\n❌ Loss: ${statsDia.loss}\n🔥 EFICIÊNCIA: ${(((statsDia.winDireto+statsDia.winGales)/statsDia.analises)*100).toFixed(1)}%`, false);
 }, 300000);
 
+// Reset Diário (Meia-noite de Brasília)
 setInterval(() => {
-    if (statsSemana.analises === 0) return;
-    enviarTelegram(`🏆 *ACUMULADO SEMANAL*\n\n📈 Total Análises: ${statsSemana.analises}\n✅ Wins: ${statsSemana.winDireto + statsSemana.winGales}\n❌ Reds: ${statsSemana.loss}\n\n🎯 ASSERTIVIDADE: ${(((statsSemana.winDireto+statsSemana.winGales)/statsSemana.analises)*100).toFixed(1)}%`, false);
-}, 1800000);
-
-setInterval(() => {
-    const n = new Date();
+    const n = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     if (n.getHours() === 0 && n.getMinutes() === 0) {
         statsDia = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
         Object.keys(motores).forEach(k => { motores[k].wins = 0; motores[k].loss = 0; });
@@ -210,8 +208,7 @@ app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html><html><head><title>KCM V24</title><meta name="viewport" content="width=device-width, initial-scale=1">
     <style>body{background:#05070a; color:white; font-family:sans-serif; text-align:center; padding:20px;}
     .card{background:#111418; padding:15px; border-radius:15px; border:1px solid #1e90ff; margin-bottom:10px;}</style></head>
-    <body><h3>KCM ULTIMATE - PAINEL</h3>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    <body><h3>KCM ULTIMATE - PAINEL</h3><div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
     ${slots.map((id, i) => `<div class="card"><div id="n-${i}">Lendo...</div><div id="p-${i}" style="font-size:18px; font-weight:bold; margin:10px 0;">---</div>
     <select onchange="location.href='/mudar/${i}/'+this.value" style="width:100%;"><option value="">Trocar Ativo</option>${options}</select></div>`).join('')}
     </div><script>setInterval(async()=>{ const r=await fetch('/api/status'); const d=await r.json(); 
