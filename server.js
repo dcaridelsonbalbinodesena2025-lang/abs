@@ -91,7 +91,7 @@ function gerarPlacarMsg(id) {
     const m = motores[id];
     const totalW = statsDia.winDireto + statsDia.winGales;
     const assert = statsDia.analises > 0 ? ((totalW / statsDia.analises) * 100).toFixed(1) : "0";
-    return `\n\n🏆 *PLACAR ATUAL*\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL HOJE:* ${totalW}W - ${statsDia.loss}L (${assert}%)`;
+    return `\n\n🏆 *PLACAR ATUAL*\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL HOJE:* ${totalW}W - ${statsDia.loss}L\n🔥 EFICIÊNCIA(${assert}%)`;
 }
 
 function registrarResultado(id, win, gale) {
@@ -124,8 +124,8 @@ function processarTick(id, preco) {
     }
 
     // --- ANALISANDO TAXA (ALERTA PRÉVIO AOS 45s) ---
-    if (segs >= 45 && segs <= 50 && !m.analiseEnviada && !m.operacaoAtiva) {
-        let sinalPrevia = m.forca >= 65 ? "CALL" : m.forca <= 35 ? "PUT" : null;
+    if (segs >= 40 && segs <= 50 && !m.analiseEnviada && !m.operacaoAtiva) {
+        let sinalPrevia = m.forca >= 60 ? "CALL" : m.forca <= 35 ? "PUT" : null;
         if (sinalPrevia) {
             const proxMinuto = new Date(agoraBR.getTime() + 60000);
             const horaEntrada = proxMinuto.getHours().toString().padStart(2, '0') + ":" + proxMinuto.getMinutes().toString().padStart(2, '0');
