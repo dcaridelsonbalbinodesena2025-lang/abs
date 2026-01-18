@@ -7,11 +7,10 @@ const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 
-// CONFIGURAÇÃO DA ESTRATÉGIA PAINEL ON
+// --- CONFIGURAÇÃO ESTRATÉGIA PAINEL ON ---
 const FORCA_MINIMA = 70; 
 const PCT_RECUO_TAXA = 30; 
 
-// --- LISTA DE ATIVOS COMPLETA ---
 // --- LISTA DE ATIVOS COMPLETA E ATUALIZADA (SINTÉTICOS, FOREX, METAIS E CRIPTO) ---
 const LISTA_ATIVOS = [
     { id: "NONE", nome: "❌ DESATIVAR SLOT" },
@@ -68,7 +67,7 @@ const LISTA_ATIVOS = [
 ];
 
 
-// --- BANCO DE DADOS EM MEMÓRIA ---
+// --- BANCO DE DATOS (DIÁRIO E SEMANAL) ---
 let statsDiario = { analises: 0, winDireto: 0, lossDireto: 0, winGale: 0, lossGale: 0, ativos: {} };
 let statsSemanal = {
     segunda: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
@@ -97,7 +96,7 @@ function inicializarMotores() {
     });
 }
 
-// --- FUNÇÕES DE TEMPO E MENSAGEM ---
+// --- UTILITÁRIOS ---
 function getHoraBR(offsetSegundos = 0) {
     const data = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     if (offsetSegundos) data.setSeconds(data.getSeconds() + offsetSegundos);
@@ -107,6 +106,7 @@ function getHoraBR(offsetSegundos = 0) {
 async function enviarTelegram(msg) {
     const payload = {
         chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown",
+        disable_web_page_preview: true, // DIMINUI A ALTURA DA MENSAGEM (REMOVE O PREVIEW DO SITE)
         reply_markup: { inline_keyboard: [[{ text: "📲 DERIV.COM", url: LINK_CORRETORA }]] }
     };
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
@@ -114,8 +114,7 @@ async function enviarTelegram(msg) {
 
 function registrarResultado(ativoNome, resultado, foiGale) {
     const agora = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
-    const dias = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-    const diaHoje = dias[agora.getDay()];
+    const diaHoje = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][agora.getDay()];
 
     if (!statsDiario.ativos[ativoNome]) statsDiario.ativos[ativoNome] = { w: 0, l: 0 };
     if (resultado === "WIN") {
@@ -135,7 +134,7 @@ function registrarResultado(ativoNome, resultado, foiGale) {
     statsSemanal[diaHoje].pior = ranking[ranking.length - 1][0];
 }
 
-// --- PROCESSAMENTO DE TICKS ---
+// --- LÓGICA DE TICKS ---
 function processarTick(id, preco) {
     const m = motores[id]; if (!m) return;
     const agoraBR = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
@@ -147,7 +146,7 @@ function processarTick(id, preco) {
     }
 
     if (segs >= 5 && segs < 10 && !m.analiseEnviada && !m.operacaoAtiva) {
-        enviarTelegram(`🔍 *ANALISANDO ENTRADA*\n💎 Ativo: ${m.nome}\n⏰ Entrada: *${getHoraBR(60-segs).slice(0,5)}:00*\n⏳ _Aguardando confirmação..._`);
+        enviarTelegram(`🔍 *ANALISANDO POSSÍVEL ENTRADA*\n💎 Ativo: ${m.nome}\n⏰ Entrada: *${getHoraBR(60-segs).slice(0,5)}:00*`);
         m.analiseEnviada = true;
     }
 
@@ -155,7 +154,7 @@ function processarTick(id, preco) {
         m.sinalPendente = m.forca >= FORCA_MINIMA ? "CALL" : m.forca <= (100 - FORCA_MINIMA) ? "PUT" : null;
         if (m.sinalPendente && !m.operacaoAtiva) {
             m.buscandoTaxa = true;
-            enviarTelegram(`⏳ *BUSCANDO TAXA...*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.sinalPendente === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}`);
+            enviarTelegram(`⏳ *BUSCANDO POSSÍVEL ENTRADA...*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.sinalPendente === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}`);
         }
         m.corpoVelaAnterior = Math.abs(preco - m.aberturaVelaAtual);
         m.fechamentoVelaAnterior = preco; m.aberturaVelaAtual = preco;
@@ -167,12 +166,12 @@ function processarTick(id, preco) {
                     (m.sinalPendente === "PUT" && preco >= (m.fechamentoVelaAnterior + dist));
         if (bateu) {
             m.buscandoTaxa = false; m.operacaoAtiva = m.sinalPendente; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 *CLIQUE AGORA*\n💎 Ativo: ${m.nome}\n🎯 Sinal: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${m.nome}\n🎯 Sinal: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
         }
     }
 
     if (segs >= 30 && m.buscandoTaxa) {
-        enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA: ${m.nome}*\nPreço não atingiu a taxa ideal.`);
+        enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA: ${m.nome}*\nPreço não atingiu a taxa.`);
         m.buscandoTaxa = false; m.sinalPendente = null; m.analiseEnviada = false;
     }
 
@@ -182,14 +181,14 @@ function processarTick(id, preco) {
             const win = (m.operacaoAtiva === "CALL" && preco > m.precoEntrada) || (m.operacaoAtiva === "PUT" && preco < m.precoEntrada);
             if (win) {
                 registrarResultado(m.nome, "WIN", m.galeAtual > 0);
-                enviarTelegram(`✅ *GREEN: ${m.nome}*\n🏆 Resultado: DIRETO\n🔥 Eficiência: ${(( (statsDiario.winDireto + statsDiario.winGale) / statsDiario.analises) * 100).toFixed(1)}%`);
+                enviarTelegram(`✅ *GREEN: ${m.nome}*\n🏆 Resultado: ${m.galeAtual > 0 ? 'GALE '+m.galeAtual : 'DIRETO'}`);
                 m.operacaoAtiva = null; m.galeAtual = 0; m.analiseEnviada = false;
             } else if (m.galeAtual < 2) {
                 m.galeAtual++; m.precoEntrada = preco; m.tempoOp = 60;
                 enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
             } else {
                 registrarResultado(m.nome, "LOSS", true);
-                enviarTelegram(`❌ *LOSS: ${m.nome}*\nEstude o gráfico e retorne com calma.`);
+                enviarTelegram(`❌ *LOSS: ${m.nome}*`);
                 m.operacaoAtiva = null; m.galeAtual = 0; m.analiseEnviada = false;
             }
         }
@@ -197,24 +196,22 @@ function processarTick(id, preco) {
 }
 
 // --- RELATÓRIOS ---
-setInterval(() => { // Diário 5 em 5 min
+setInterval(() => { // Diário (5 min)
     if (statsDiario.analises === 0) return;
-    let ranking = Object.entries(statsDiario.ativos).sort((a,b) => (b[1].w - b[1].l) - (a[1].w - a[1].l)).slice(0,3);
-    let rankingTxt = ranking.map((a,i) => `${i+1}º ${a[0]}`).join('\n');
-    let msg = `📊 *RELATÓRIO DIÁRIO*\n\n📈 Análises: ${statsDiario.analises}\n✅ Win Direto: ${statsDiario.winDireto}\n🔄 Win Gale: ${statsDiario.winGale}\n❌ Loss: ${statsDiario.lossDireto + statsDiario.lossGale}\n\n🏆 *TOP ATIVOS:*\n${rankingTxt}\n\n🔥 *EFICIÊNCIA: ${(((statsDiario.winDireto + statsDiario.winGale) / statsDiario.analises) * 100).toFixed(1)}%*`;
-    enviarTelegram(msg);
+    let efici = (((statsDiario.winDireto + statsDiario.winGale) / statsDiario.analises) * 100).toFixed(1);
+    enviarTelegram(`📊 *RELATÓRIO DIÁRIO*\n\n📋 Análises: ${statsDiario.analises}\n✅ Win Direto: ${statsDiario.winDireto}\n🔄 Win Gale: ${statsDiario.winGale}\n❌ Loss Geral: ${statsDiario.lossDireto + statsDiario.lossGale}\n🔥 Eficiência: ${efici}%`);
 }, 300000);
 
-setInterval(() => { // Semanal 20 em 20 min
+setInterval(() => { // Semanal (20 min)
     const dias = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
     const diaHoje = dias[new Date().getDay()];
     const s = statsSemanal[diaHoje];
     if (s.analises === 0) return;
-    let msg = `📅 *RELATÓRIO SEMANAL (${diaHoje.toUpperCase()})*\n\n📋 Análises: ${s.analises}\n✅ Total Win: ${s.wins + s.winGale}\n❌ Total Loss: ${s.loss + s.lossGale}\n🔝 Melhor: ${s.melhor}\n🔄 Wins c/ Gale: ${s.winGale}\n\n🔥 *ASSERTIVIDADE: ${(((s.wins + s.winGale) / s.analises) * 100).toFixed(1)}%*`;
-    enviarTelegram(msg);
+    let efici = (((s.wins + s.winGale) / s.analises) * 100).toFixed(1);
+    enviarTelegram(`📅 *RELATÓRIO: ${diaHoje.toUpperCase()}*\n\n📋 Análises: ${s.analises}\n✅ Win Geral: ${s.wins + s.winGale}\n❌ Loss Geral: ${s.loss + s.lossGale}\n🔝 Melhor: ${s.melhor}\n📉 Pior: ${s.pior}\n🔄 Win Gale: ${s.winGale}\n🔥 Eficiência: ${efici}%`);
 }, 1200000);
 
-// --- CONEXÃO ---
+// --- CONEXÃO E SERVER ---
 let ws;
 function conectar(){
     ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
@@ -222,5 +219,4 @@ function conectar(){
     ws.on('message', data => { const r=JSON.parse(data); if(r.tick) processarTick(r.tick.symbol, r.tick.quote); });
     ws.on('close', () => setTimeout(conectar, 5000));
 }
-
 inicializarMotores(); conectar(); app.listen(process.env.PORT || 3000);
