@@ -98,7 +98,7 @@ function gerarPlacarMsg(id) {
     const m = motores[id];
     const totalW = statsDia.winDireto + statsDia.winGales;
     const assert = statsDia.analises > 0 ? ((totalW / statsDia.analises) * 100).toFixed(1) : "0";
-    return `\n\n🏆 *PLACAR ATUAL* 🏆\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL HOJE:* ${totalW}W - ${statsDia.loss}L (${assert}%)`;
+    return `\n\n🏆 *PLACAR ATUAL* 🏆\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL HOJE:* ${totalW}W - ${statsDia.loss}L\n🔥EFICIÊNCIA: (${assert}%)`;
 }
 
 function registrarResultado(id, win, gale) {
