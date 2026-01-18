@@ -7,11 +7,9 @@ const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 
-// --- LISTA MASSIVA E CATEGORIZADA PARA O PAINEL ---
+// --- LISTA MASSIVA E CATEGORIZADA ---
 const LISTA_ATIVOS = [
     { id: "NONE", nome: "❌ DESATIVAR SLOT" },
-    
-    // --- ÍNDICES SINTÉTICOS (VOLATILITY) ---
     { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
     { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
     { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
@@ -22,23 +20,17 @@ const LISTA_ATIVOS = [
     { id: "R_50", nome: "📊 Volatility 50" },
     { id: "R_75", nome: "📊 Volatility 75" },
     { id: "R_100", nome: "📊 Volatility 100" },
-
-    // --- ÍNDICES JUMP ---
     { id: "JD10", nome: "🚀 Jump 10" },
     { id: "JD25", nome: "🚀 Jump 25" },
     { id: "JD50", nome: "🚀 Jump 50" },
     { id: "JD75", nome: "🚀 Jump 75" },
     { id: "JD100", nome: "🚀 Jump 100" },
-
-    // --- BOOM & CRASH ---
     { id: "BOOM300", nome: "💥 Boom 300" },
     { id: "BOOM500", nome: "💥 Boom 500" },
     { id: "BOOM1000", nome: "💥 Boom 1000" },
     { id: "CRASH300", nome: "📉 Crash 300" },
     { id: "CRASH500", nome: "📉 Crash 500" },
     { id: "CRASH1000", nome: "📉 Crash 1000" },
-
-    // --- FOREX (PARES DE MOEDAS) ---
     { id: "frxEURUSD", nome: "💱 EUR/USD" },
     { id: "frxGBPUSD", nome: "💱 GBP/USD" },
     { id: "frxUSDJPY", nome: "💱 USD/JPY" },
@@ -47,14 +39,11 @@ const LISTA_ATIVOS = [
     { id: "frxUSDCHF", nome: "💱 USD/CHF" },
     { id: "frxEURGBP", nome: "💱 EUR/GBP" },
     { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
-
-    // --- CRIPTOMOEDAS ---
     { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC)" },
     { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH)" },
     { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC)" },
     { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP)" }
 ];
-
 
 let globalStats = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
 let motores = {};
@@ -93,7 +82,7 @@ function gerarPlacarMsg(id) {
     const m = motores[id];
     const totalW = globalStats.winDireto + globalStats.winGales;
     const assert = globalStats.analises > 0 ? ((totalW / globalStats.analises) * 100).toFixed(1) : "0";
-    return `\n🏆PLACAR🏆\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL:* ${totalW}W - ${globalStats.loss}L (${assert}%)`;
+    return `\n\n🏆 *PLACAR ATUAL* 🏆\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL:* ${totalW}W - ${globalStats.loss}L (${assert}%)`;
 }
 
 function processarTick(id, preco) {
@@ -109,8 +98,8 @@ function processarTick(id, preco) {
     }
 
     if (m.buscandoTaxa && !m.operacaoAtiva && segs <= 30) {
-        let diffVelaAnterior = Math.abs(m.fechamentoAnterior - m.aberturaVela) || 0.0001;
-        let alvo = diffVelaAnterior * 0.20; 
+        let diffV = Math.abs(m.fechamentoAnterior - m.aberturaVela) || 0.0001;
+        let alvo = diffV * 0.20; 
         if ((m.sinalPendente === "CALL" && preco <= (m.aberturaVela - alvo)) || (m.sinalPendente === "PUT" && preco >= (m.aberturaVela + alvo))) {
             m.operacaoAtiva = m.sinalPendente; m.precoEntrada = preco; m.tempoOp = (60 - segs); m.buscandoTaxa = false;
             enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${txtSinal(m.operacaoAtiva)}${gerarPlacarMsg(id)}`);
@@ -147,6 +136,15 @@ function processarTick(id, preco) {
         }
     }
 }
+
+// RELATÓRIO AUTOMÁTICO A CADA 5 MINUTOS
+setInterval(() => {
+    if (globalStats.analises === 0) return;
+    const totalW = globalStats.winDireto + globalStats.winGales;
+    const assert = ((totalW / globalStats.analises) * 100).toFixed(1);
+    let rank = Object.values(motores).filter(m => (m.wins + m.loss) > 0).sort((a,b) => b.wins - a.wins).slice(0, 3).map((it, i) => `${i+1}º ${it.nome}: ${it.wins}W`).join("\n");
+    enviarTelegram(`📊 *RELATÓRIO DE PERFORMANCE*\n\n🌍 *GLOBAL:* ${totalW}W - ${globalStats.loss}L\n🎯 *ASSERTIVIDADE:* ${assert}%\n\n🏆 *TOP ATIVOS:*\n${rank || "Sem dados"}`, false);
+}, 300000);
 
 app.get('/api/status', (req, res) => res.json({ slots, motores, globalStats }));
 
