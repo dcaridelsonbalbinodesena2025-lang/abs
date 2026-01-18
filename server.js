@@ -1,137 +1,164 @@
 const axios = require('axios');
 const express = require('express');
-const path = require('path');
+const WebSocket = require('ws');
 const app = express();
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '.')));
 
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
-const LINK_IQ = "https://iqoption.com/trader";
+const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 
-const listaAtivos = ["NENHUM", "SOL/USD", "SOL/USD-OTC", "USD/BRL", "USD/BRL-OTC", "USD/COP", "USD/COP-OTC", "AUD/CAD", "AUD/CAD-OTC", "AUD/JPY", "AUD/JPY-OTC", "BTC/USD", "BTC/USD-OTC", "ETH/USD", "ETH/USD-OTC", "EUR/AUD", "EUR/AUD-OTC", "EUR/CAD", "EUR/CAD-OTC", "EUR/CHF", "EUR/CHF-OTC", "EUR/GBP", "EUR/GBP-OTC", "EUR/JPY", "EUR/JPY-OTC", "EUR/USD", "EUR/USD-OTC", "EUR/NZD", "EUR/NZD-OTC", "GBP/AUD", "GBP/AUD-OTC", "GBP/CAD", "GBP/CAD-OTC", "GBP/CHF", "GBP/CHF-OTC", "GBP/JPY", "GBP/JPY-OTC", "GBP/NZD", "GBP/NZD-OTC", "GBP/USD", "GBP/USD-OTC", "USD/CAD", "USD/CAD-OTC", "USD/CHF", "USD/CHF-OTC", "USD/JPY", "USD/JPY-OTC"];
-let ativosSelecionados = ["EUR/USD", "GBP/USD", "NENHUM", "NENHUM"]; 
+// --- LISTA COMPLETA E EXPANDIDA DERIV REAL ---
+const ATIVOS_DADOS = [
+    // FOREX
+    { id: "frxEURUSD", nome: "EUR/USD" }, { id: "frxGBPUSD", nome: "GBP/USD" },
+    { id: "frxUSDJPY", nome: "USD/JPY" }, { id: "frxAUDUSD", nome: "AUD/USD" },
+    { id: "frxUSDCAD", nome: "USD/CAD" }, { id: "frxUSDCHF", nome: "USD/CHF" },
+    { id: "frxEURGBP", nome: "EUR/GBP" }, { id: "frxEURJPY", nome: "EUR/JPY" },
+    { id: "frxGBPJPY", nome: "GBP/JPY" }, { id: "frxAUDJPY", nome: "AUD/JPY" },
+    { id: "frxXAUUSD", nome: "OURO (XAU/USD)" },
+    // CRIPTO
+    { id: "cryBTCUSD", nome: "BITCOIN (BTC)" }, { id: "cryETHUSD", nome: "ETHEREUM (ETH)" },
+    { id: "cryLTCUSD", nome: "LITECOIN (LTC)" }, { id: "cryXRPUSD", nome: "RIPPLE (XRP)" },
+    // SINTÉTICOS
+    { id: "1HZ10V", nome: "Volatility 10 (1s)" }, { id: "1HZ25V", nome: "Volatility 25 (1s)" },
+    { id: "1HZ50V", nome: "Volatility 50 (1s)" }, { id: "1HZ75V", nome: "Volatility 75 (1s)" },
+    { id: "1HZ100V", nome: "Volatility 100 (1s)" }, { id: "R_10", nome: "Volatility 10" },
+    { id: "R_25", nome: "Volatility 25" }, { id: "R_50", nome: "Volatility 50" },
+    { id: "R_75", nome: "Volatility 75" }, { id: "R_100", nome: "Volatility 100" },
+    { id: "BOOM500", nome: "Boom 500" }, { id: "CRASH500", nome: "Crash 500" }
+];
 
-let global = { analises: 0, wins: 0, g1: 0, g2: 0, loss: 0, redGale: 0 };
-let dadosAtivos = {};
+let globalStats = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
+let motores = {};
 
-listaAtivos.forEach(a => {
-    dadosAtivos[a] = { wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0, gatilhoRusso: false, direcao: "", ultimoMinuto: -1, emOperacao: false, buscaRetracao: false };
+ATIVOS_DADOS.forEach(a => {
+    motores[a.id] = { 
+        nome: a.nome, wins: 0, loss: 0, aberturaVela: 0, fechamentoAnterior: 0, 
+        forca: 50, buscandoTaxa: false, operacaoAtiva: null, galeAtual: 0, 
+        tempoOp: 0, precoEntrada: 0, sinalPendente: null 
+    };
 });
 
 async function enviarTelegram(msg, comBotao = true) {
     const payload = { chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown" };
-    if (comBotao) { payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }]] }; }
+    if (comBotao) payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR AGORA", url: LINK_CORRETORA }]] };
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
-function obterStatusGeral() {
-    const totalW = global.wins + global.g1 + global.g2;
-    const totalL = global.loss + global.redGale;
-    const totalGeral = totalW + totalL;
-    const ef = totalGeral > 0 ? ((totalW / totalGeral) * 100).toFixed(1) : "0.0";
-    return `📊 *PLACAR GERAL:* ${totalW}W - ${totalL}L\n🔥 *EFICIÊNCIA:* ${ef}%`;
-}
+function conectarDeriv() {
+    const ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
 
-function verificarResultadoM1(ativo, direcao, tempoParaFechar) {
-    const d = dadosAtivos[ativo];
-    d.emOperacao = true;
-    
-    setTimeout(() => {
-        if (Math.random() > 0.4) {
-            d.wins++; global.wins++;
-            enviarTelegram(`✅ *WIN DIRETO: ${ativo}*\n\n${obterStatusGeral()}`, false);
-            d.emOperacao = false; d.buscaRetracao = false;
-        } else {
-            // MENSAGEM DE GALE 1 COM O SINAL INCLUÍDO
-            enviarTelegram(`⚠️ **GALE 1: ${ativo}**\n🎯 **SINAL:** ${direcao}\n🔁 **REPETIR ENTRADA AGORA!**`);
+    ws.on('open', () => {
+        console.log("Conectado na Deriv! Monitorando Lista Expandida.");
+        ATIVOS_DADOS.forEach(a => ws.send(JSON.stringify({ ticks: a.id })));
+    });
+
+    ws.on('message', (data) => {
+        const res = JSON.parse(data);
+        if (!res.tick) return;
+        const m = motores[res.tick.symbol];
+        if (!m) return;
+
+        const preco = res.tick.quote;
+        const segs = new Date().getSeconds();
+
+        // 1. Cálculo da Força Real
+        if (m.aberturaVela > 0) {
+            let diff = preco - m.aberturaVela;
+            m.forca = 50 + (diff / (m.aberturaVela * 0.0002) * 20);
+            m.forca = Math.min(98, Math.max(2, m.forca));
+        }
+
+        // 2. Lógica de Retração Real de 20% (Confirmação)
+        if (m.buscandoTaxa && !m.operacaoAtiva && segs <= 30) {
+            let diffVelaAnterior = Math.abs(m.fechamentoAnterior - m.aberturaVela) || 0.0001;
+            let alvo = diffVelaAnterior * 0.20; 
             
-            setTimeout(() => {
-                if (Math.random() > 0.3) {
-                    d.g1++; global.g1++;
-                    enviarTelegram(`✅ *WIN G1: ${ativo}*\n\n${obterStatusGeral()}`, false);
-                    d.emOperacao = false; d.buscaRetracao = false;
+            let confirmou = (m.sinalPendente === "CALL" && preco <= (m.aberturaVela - alvo)) || 
+                            (m.sinalPendente === "PUT" && preco >= (m.aberturaVela + alvo));
+
+            if (confirmou) {
+                m.operacaoAtiva = m.sinalPendente;
+                m.precoEntrada = preco;
+                m.tempoOp = (60 - segs);
+                m.buscandoTaxa = false;
+                enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 *CLIQUE AGORA*\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${m.operacaoAtiva === "CALL" ? "🟢 CALL" : "🔴 PUT"}\n⏱ *Expiração:* M1`);
+            }
+        }
+
+        // 3. Abortar se não retrair até os 31 segundos
+        if (segs === 31 && m.buscandoTaxa) {
+            m.buscandoTaxa = false;
+            enviarTelegram(`❌ *ANÁLISE ABORTADA: ${m.nome}*\n⚠️ *MOTIVO:* Taxa de retração não atingida.`, false);
+        }
+
+        // 4. Virada de Vela (Segundo 00)
+        if (segs === 0 && m.aberturaVela !== preco) {
+            m.fechamentoAnterior = m.aberturaVela;
+            m.aberturaVela = preco;
+            
+            if (m.forca >= 70) m.sinalPendente = "CALL";
+            else if (m.forca <= 30) m.sinalPendente = "PUT";
+            else m.sinalPendente = null;
+
+            if (m.sinalPendente && !m.operacaoAtiva) {
+                m.buscandoTaxa = true;
+                enviarTelegram(`⚠️ *ANALISANDO:* ${m.nome}\n🔥 *FORÇA:* ${m.forca.toFixed(0)}%\n🎯 *SINAL:* ${m.sinalPendente === "CALL" ? "🟢 CALL" : "🔴 PUT"}\n\n⏳ *AGUARDANDO RETRAÇÃO...*`);
+            }
+        }
+
+        // 5. Verificação de Resultados e Gales
+        if (m.tempoOp > 0) {
+            m.tempoOp--;
+            if (m.tempoOp <= 0) {
+                const win = (m.operacaoAtiva === "CALL" && preco > m.precoEntrada) || (m.operacaoAtiva === "PUT" && preco < m.precoEntrada);
+                const sinalOriginal = m.operacaoAtiva;
+
+                if (win) {
+                    if (m.galeAtual === 0) globalStats.winDireto++; else globalStats.winGales++;
+                    m.wins++; globalStats.analises++;
+                    enviarTelegram(`✅ *WIN ${m.galeAtual === 0 ? 'DIRETO' : 'GALE ' + m.galeAtual}: ${m.nome}*\n📊 *PLACAR:* ${globalStats.winDireto + globalStats.winGales}W - ${globalStats.loss}L`, false);
+                    m.operacaoAtiva = null; m.galeAtual = 0;
+                } else if (m.galeAtual < 2) {
+                    m.galeAtual++;
+                    m.precoEntrada = preco;
+                    m.tempoOp = 60;
+                    enviarTelegram(`⚠️ **GALE ${m.galeAtual}: ${m.nome}**\n🎯 **SINAL:** ${sinalOriginal === "CALL" ? "🟢 CALL" : "🔴 PUT"}\n🔁 **ENTRAR AGORA!**`);
                 } else {
-                    // MENSAGEM DE GALE 2 COM O SINAL INCLUÍDO
-                    enviarTelegram(`⚠️ **GALE 2: ${ativo}**\n🎯 **SINAL:** ${direcao}\n🔁 **ÚLTIMA TENTATIVA!**`);
-                    
-                    setTimeout(() => {
-                        if (Math.random() > 0.2) {
-                            d.g2++; global.g2++;
-                            enviarTelegram(`✅ *WIN G2: ${ativo}*\n\n${obterStatusGeral()}`, false);
-                        } else {
-                            d.redGale++; global.redGale++;
-                            enviarTelegram(`❌ *RED: ${ativo}*\n\n${obterStatusGeral()}`, false);
-                        }
-                        d.emOperacao = false; d.buscaRetracao = false;
-                    }, 60000);
+                    m.loss++; globalStats.loss++; globalStats.analises++;
+                    enviarTelegram(`❌ *RED: ${m.nome}*\n📊 *PLACAR:* ${globalStats.winDireto + globalStats.winGales}W - ${globalStats.loss}L`, false);
+                    m.operacaoAtiva = null; m.galeAtual = 0;
                 }
-            }, 60000);
+            }
         }
-    }, tempoParaFechar);
+    });
+
+    ws.on('close', () => setTimeout(conectarDeriv, 5000));
 }
 
-// ... (Restante do código de Ciclo Sniper e Relatório de Performance igual ao anterior)
-
+// 📊 RELATÓRIO ROBUSTO (A CADA 5 MINUTOS)
 setInterval(() => {
-    const agora = new Date();
-    const segs = agora.getSeconds();
-    const minAtual = agora.getMinutes();
-    ativosSelecionados.forEach(ativo => {
-        if (ativo === "NENHUM") return; 
-        const d = dadosAtivos[ativo];
-        if (d.emOperacao) return;
-        if (segs === 50 && d.ultimoMinuto !== minAtual) {
-            const forcaReal = Math.floor(Math.random() * 31) + 70; 
-            if (forcaReal >= 70) {
-                d.direcao = Math.random() > 0.5 ? "🟢 CALL" : "🔴 PUT";
-                d.gatilhoRusso = true; d.ultimoMinuto = minAtual; global.analises++;
-                enviarTelegram(`⚠️ *ANALISANDO:* ${ativo}\n🔥 *FORÇA:* ${forcaReal}%\n🎯 *SINAL:* ${d.direcao}\n\n⏳ *AGUARDANDO CONFIRMAÇÃO...*`);
-            }
-        }
-        if (d.gatilhoRusso && segs > 0 && segs <= 30 && !d.buscaRetracao) {
-            if (Math.random() > 0.4) {
-                d.buscaRetracao = true; d.gatilhoRusso = false;
-                enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 **CLIQUE AGORA**\n💎 *${ativo}*\n🎯 *SINAL:* ${d.direcao}\n⏱ *EXPIRAÇÃO:* M1`);
-                verificarResultadoM1(ativo, d.direcao, (60 - segs) * 1000);
-            }
-        }
-        if (segs === 31 && d.gatilhoRusso && !d.buscaRetracao) {
-            enviarTelegram(`❌ *ANÁLISE ABORTADA: ${ativo}*`, false);
-            d.gatilhoRusso = false; d.buscaRetracao = false;
-        }
-    });
-}, 1000);
+    const totalW = globalStats.winDireto + globalStats.winGales;
+    const ef = globalStats.analises > 0 ? ((totalW / (totalW + globalStats.loss)) * 100).toFixed(1) : 0;
+    
+    let ranking = Object.values(motores)
+        .filter(m => (m.wins + m.loss) > 0)
+        .sort((a,b) => b.wins - a.wins)
+        .slice(0, 4)
+        .map((item, i) => `${i+1}º ${item.nome}: ${item.wins}W`)
+        .join("\n");
 
-// Relatório de performance a cada 5 minutos (Aquele robusto da imagem 2)
-function gerarRelatorioPerformance() {
-    const totalW = global.wins + global.g1 + global.g2;
-    const totalL = global.loss + global.redGale;
-    const totalGeral = totalW + totalL;
-    const efGlobal = totalGeral > 0 ? ((totalW / totalGeral) * 100).toFixed(1) : "0.0";
-    const ranking = Object.keys(dadosAtivos)
-        .filter(a => (dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2 + dadosAtivos[a].loss + dadosAtivos[a].redGale) > 0)
-        .map(a => {
-            const da = dadosAtivos[a];
-            const ta = da.wins + da.g1 + da.g2 + da.loss + da.redGale;
-            const efa = ta > 0 ? (((da.wins + da.g1 + da.g2) / ta) * 100).toFixed(1) : "0.0";
-            return { nome: a, ef: parseFloat(efa) };
-        })
-        .sort((a, b) => b.ef - a.ef).slice(0, 4)
-        .map((item, i) => `${i + 1}º ${item.nome}: ${item.ef}%`).join("\n");
+    const msg = `📊 *RELATÓRIO DE PERFORMANCE*\n\n📈 *GERAL:*\n` +
+                `• Análises: ${globalStats.analises}\n` +
+                `• Wins Diretos: ${globalStats.winDireto}\n` +
+                `• Wins c/ Gale: ${globalStats.winGales}\n` +
+                `• Reds Total: ${globalStats.loss}\n\n` +
+                `🏆 *RANKING ATIVOS:*\n${ranking || "Sem operações no momento"}\n\n` +
+                `🔥 *EFICIÊNCIA ROBO: ${ef}%*`;
+    
+    enviarTelegram(msg, false);
+}, 300000);
 
-    const mensagem = `📊 *RELATÓRIO DE PERFORMANCE*\n\n📈 *GERAL:*\n• Análises: ${global.analises}\n• Wins Diretos: ${global.wins}\n• Losses Diretos: ${global.loss}\n• Wins c/ Gale: ${global.g1 + global.g2}\n• Reds c/ Gale: ${global.redGale}\n\n🏆 *RANKING ATIVOS:*\n${ranking || "Sem operações"}\n\n🔥 *EFICIÊNCIA ROBO: ${efGlobal}%*`;
-    enviarTelegram(mensagem, false);
-}
-setInterval(gerarRelatorioPerformance, 300000);
-
-app.get('/lista-ativos', (req, res) => res.json(listaAtivos));
-app.post('/selecionar-ativo', (req, res) => { ativosSelecionados[req.body.index] = req.body.ativo; res.json({ status: "ok" }); });
-app.get('/dados', (req, res) => {
-    const resp = ativosSelecionados.map(a => {
-        if (a === "NENHUM") return { nome: "DESATIVADO", wins: 0, loss: 0 };
-        return { nome: a, wins: dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2, loss: dadosAtivos[a].loss + dadosAtivos[a].redGale };
-    });
-    res.json(resp);
-});
+conectarDeriv();
+app.get('/', (req, res) => res.send("Robô KCM Deriv 24h Online"));
 app.listen(process.env.PORT || 3000);
