@@ -25,69 +25,43 @@ async function enviarTelegram(msg, comBotao = true) {
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
-// FUNÇÃO PARA CALCULAR EFICIÊNCIA POR ATIVO
-function calcEfAtivo(nome) {
-    const d = dadosAtivos[nome];
-    const t = d.wins + d.g1 + d.g2 + d.loss + d.redGale;
-    return t > 0 ? (((d.wins + d.g1 + d.g2) / t) * 100).toFixed(1) : "0.0";
-}
-
-// --- NOVO RELATÓRIO ROBUSTO (IGUAL À SEGUNDA IMAGEM) ---
-function gerarRelatorioPerformance() {
+function obterStatusGeral() {
     const totalW = global.wins + global.g1 + global.g2;
     const totalL = global.loss + global.redGale;
     const totalGeral = totalW + totalL;
-    const efGlobal = totalGeral > 0 ? ((totalW / totalGeral) * 100).toFixed(1) : "0.0";
-
-    // Criar Ranking dos TOP 4 Ativos
-    const ranking = Object.keys(dadosAtivos)
-        .filter(a => (dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2 + dadosAtivos[a].loss + dadosAtivos[a].redGale) > 0)
-        .map(a => ({ nome: a, ef: parseFloat(calcEfAtivo(a)) }))
-        .sort((a, b) => b.ef - a.ef)
-        .slice(0, 4)
-        .map((item, i) => `${i + 1}º ${item.nome}: ${item.ef}%`).join("\n");
-
-    const mensagem = `📊 *RELATÓRIO DE PERFORMANCE*\n\n` +
-                     `📈 *GERAL:*\n` +
-                     `• Análises: ${global.analises}\n` +
-                     `• Wins Diretos: ${global.wins}\n` +
-                     `• Losses Diretos: ${global.loss}\n` +
-                     `• Wins c/ Gale: ${global.g1 + global.g2}\n` +
-                     `• Reds c/ Gale: ${global.redGale}\n\n` +
-                     `🏆 *RANKING ATIVOS:*\n${ranking || "Sem operações ainda"}\n\n` +
-                     `🔥 *EFICIÊNCIA ROBO: ${efGlobal}%*`;
-
-    enviarTelegram(mensagem, false);
+    const ef = totalGeral > 0 ? ((totalW / totalGeral) * 100).toFixed(1) : "0.0";
+    return `📊 *PLACAR GERAL:* ${totalW}W - ${totalL}L\n🔥 *EFICIÊNCIA:* ${ef}%`;
 }
 
-// Executa o relatório a cada 5 minutos
-setInterval(gerarRelatorioPerformance, 300000);
-
-// --- LÓGICA DE RESULTADOS (MANTIDA) ---
 function verificarResultadoM1(ativo, direcao, tempoParaFechar) {
     const d = dadosAtivos[ativo];
     d.emOperacao = true;
+    
     setTimeout(() => {
         if (Math.random() > 0.4) {
             d.wins++; global.wins++;
-            enviarTelegram(`✅ *WIN DIRETO: ${ativo}*`, false);
+            enviarTelegram(`✅ *WIN DIRETO: ${ativo}*\n\n${obterStatusGeral()}`, false);
             d.emOperacao = false; d.buscaRetracao = false;
         } else {
-            enviarTelegram(`⚠️ **GALE 1: ${ativo}**`, false);
+            // MENSAGEM DE GALE 1 COM O SINAL INCLUÍDO
+            enviarTelegram(`⚠️ **GALE 1: ${ativo}**\n🎯 **SINAL:** ${direcao}\n🔁 **REPETIR ENTRADA AGORA!**`);
+            
             setTimeout(() => {
                 if (Math.random() > 0.3) {
                     d.g1++; global.g1++;
-                    enviarTelegram(`✅ *WIN G1: ${ativo}*`, false);
+                    enviarTelegram(`✅ *WIN G1: ${ativo}*\n\n${obterStatusGeral()}`, false);
                     d.emOperacao = false; d.buscaRetracao = false;
                 } else {
-                    enviarTelegram(`⚠️ **GALE 2: ${ativo}**`, false);
+                    // MENSAGEM DE GALE 2 COM O SINAL INCLUÍDO
+                    enviarTelegram(`⚠️ **GALE 2: ${ativo}**\n🎯 **SINAL:** ${direcao}\n🔁 **ÚLTIMA TENTATIVA!**`);
+                    
                     setTimeout(() => {
                         if (Math.random() > 0.2) {
                             d.g2++; global.g2++;
-                            enviarTelegram(`✅ *WIN G2: ${ativo}*`, false);
+                            enviarTelegram(`✅ *WIN G2: ${ativo}*\n\n${obterStatusGeral()}`, false);
                         } else {
                             d.redGale++; global.redGale++;
-                            enviarTelegram(`❌ *RED: ${ativo}*`, false);
+                            enviarTelegram(`❌ *RED: ${ativo}*\n\n${obterStatusGeral()}`, false);
                         }
                         d.emOperacao = false; d.buscaRetracao = false;
                     }, 60000);
@@ -97,7 +71,8 @@ function verificarResultadoM1(ativo, direcao, tempoParaFechar) {
     }, tempoParaFechar);
 }
 
-// --- CICLO SNIPER ---
+// ... (Restante do código de Ciclo Sniper e Relatório de Performance igual ao anterior)
+
 setInterval(() => {
     const agora = new Date();
     const segs = agora.getSeconds();
@@ -127,6 +102,28 @@ setInterval(() => {
         }
     });
 }, 1000);
+
+// Relatório de performance a cada 5 minutos (Aquele robusto da imagem 2)
+function gerarRelatorioPerformance() {
+    const totalW = global.wins + global.g1 + global.g2;
+    const totalL = global.loss + global.redGale;
+    const totalGeral = totalW + totalL;
+    const efGlobal = totalGeral > 0 ? ((totalW / totalGeral) * 100).toFixed(1) : "0.0";
+    const ranking = Object.keys(dadosAtivos)
+        .filter(a => (dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2 + dadosAtivos[a].loss + dadosAtivos[a].redGale) > 0)
+        .map(a => {
+            const da = dadosAtivos[a];
+            const ta = da.wins + da.g1 + da.g2 + da.loss + da.redGale;
+            const efa = ta > 0 ? (((da.wins + da.g1 + da.g2) / ta) * 100).toFixed(1) : "0.0";
+            return { nome: a, ef: parseFloat(efa) };
+        })
+        .sort((a, b) => b.ef - a.ef).slice(0, 4)
+        .map((item, i) => `${i + 1}º ${item.nome}: ${item.ef}%`).join("\n");
+
+    const mensagem = `📊 *RELATÓRIO DE PERFORMANCE*\n\n📈 *GERAL:*\n• Análises: ${global.analises}\n• Wins Diretos: ${global.wins}\n• Losses Diretos: ${global.loss}\n• Wins c/ Gale: ${global.g1 + global.g2}\n• Reds c/ Gale: ${global.redGale}\n\n🏆 *RANKING ATIVOS:*\n${ranking || "Sem operações"}\n\n🔥 *EFICIÊNCIA ROBO: ${efGlobal}%*`;
+    enviarTelegram(mensagem, false);
+}
+setInterval(gerarRelatorioPerformance, 300000);
 
 app.get('/lista-ativos', (req, res) => res.json(listaAtivos));
 app.post('/selecionar-ativo', (req, res) => { ativosSelecionados[req.body.index] = req.body.ativo; res.json({ status: "ok" }); });
