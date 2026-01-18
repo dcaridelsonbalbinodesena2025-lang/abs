@@ -7,25 +7,54 @@ const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 
-// --- LISTA MASSIVA COMPLETA ---
+// --- LISTA MASSIVA E CATEGORIZADA PARA O PAINEL ---
 const LISTA_ATIVOS = [
-    { id: "NONE", nome: "❌ NENHUM (DESATIVAR)" },
-    { id: "1HZ10V", nome: "Volatility 10 (1s)" }, { id: "1HZ25V", nome: "Volatility 25 (1s)" },
-    { id: "1HZ50V", nome: "Volatility 50 (1s)" }, { id: "1HZ75V", nome: "Volatility 75 (1s)" },
-    { id: "1HZ100V", nome: "Volatility 100 (1s)" }, { id: "R_10", nome: "Volatility 10" },
-    { id: "R_25", nome: "Volatility 25" }, { id: "R_50", nome: "Volatility 50" },
-    { id: "R_75", nome: "Volatility 75" }, { id: "R_100", nome: "Volatility 100" },
-    { id: "JD10", nome: "Jump 10" }, { id: "JD25", nome: "Jump 25" },
-    { id: "JD50", nome: "Jump 50" }, { id: "JD75", nome: "Jump 75" },
-    { id: "JD100", nome: "Jump 100" },
-    { id: "BOOM300", nome: "Boom 300" }, { id: "BOOM500", nome: "Boom 500" },
-    { id: "BOOM1000", nome: "Boom 1000" }, { id: "CRASH300", nome: "Crash 300" },
-    { id: "CRASH500", nome: "Crash 500" }, { id: "CRASH1000", nome: "Crash 1000" },
-    { id: "frxEURUSD", nome: "EUR/USD" }, { id: "frxGBPUSD", nome: "GBP/USD" },
-    { id: "frxUSDJPY", nome: "USD/JPY" }, { id: "frxAUDUSD", nome: "AUD/USD" },
-    { id: "frxXAUUSD", nome: "OURO (XAU/USD)" },
-    { id: "cryBTCUSD", nome: "BITCOIN (BTC)" }, { id: "cryETHUSD", nome: "ETHEREUM (ETH)" }
+    { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+    
+    // --- ÍNDICES SINTÉTICOS (VOLATILITY) ---
+    { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+    { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+    { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+    { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+    { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
+    { id: "R_10", nome: "📊 Volatility 10" },
+    { id: "R_25", nome: "📊 Volatility 25" },
+    { id: "R_50", nome: "📊 Volatility 50" },
+    { id: "R_75", nome: "📊 Volatility 75" },
+    { id: "R_100", nome: "📊 Volatility 100" },
+
+    // --- ÍNDICES JUMP ---
+    { id: "JD10", nome: "🚀 Jump 10" },
+    { id: "JD25", nome: "🚀 Jump 25" },
+    { id: "JD50", nome: "🚀 Jump 50" },
+    { id: "JD75", nome: "🚀 Jump 75" },
+    { id: "JD100", nome: "🚀 Jump 100" },
+
+    // --- BOOM & CRASH ---
+    { id: "BOOM300", nome: "💥 Boom 300" },
+    { id: "BOOM500", nome: "💥 Boom 500" },
+    { id: "BOOM1000", nome: "💥 Boom 1000" },
+    { id: "CRASH300", nome: "📉 Crash 300" },
+    { id: "CRASH500", nome: "📉 Crash 500" },
+    { id: "CRASH1000", nome: "📉 Crash 1000" },
+
+    // --- FOREX (PARES DE MOEDAS) ---
+    { id: "frxEURUSD", nome: "💱 EUR/USD" },
+    { id: "frxGBPUSD", nome: "💱 GBP/USD" },
+    { id: "frxUSDJPY", nome: "💱 USD/JPY" },
+    { id: "frxAUDUSD", nome: "💱 AUD/USD" },
+    { id: "frxUSDCAD", nome: "💱 USD/CAD" },
+    { id: "frxUSDCHF", nome: "💱 USD/CHF" },
+    { id: "frxEURGBP", nome: "💱 EUR/GBP" },
+    { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+
+    // --- CRIPTOMOEDAS ---
+    { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC)" },
+    { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH)" },
+    { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC)" },
+    { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP)" }
 ];
+
 
 let globalStats = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
 let motores = {};
