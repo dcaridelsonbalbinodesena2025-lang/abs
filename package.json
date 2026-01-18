@@ -1,12 +1,14 @@
 {
-  "name": "robo-kcm",
+  "name": "kcm-v19-ultimate",
   "version": "1.0.0",
+  "description": "Robo Trader 24h",
   "main": "server.js",
   "dependencies": {
     "axios": "^1.6.0",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
   },
-  "scripts": {
-    "start": "node server.js"
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
