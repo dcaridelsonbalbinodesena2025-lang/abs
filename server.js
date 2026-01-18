@@ -31,7 +31,7 @@ async function enviarTelegram(msg, comBotao = true) {
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
-// CICLO SNIPER - AJUSTADO PARA 20% DE RETRAÇÃO
+// CICLO SNIPER - COM AVISO DE ANÁLISE ABORTADA
 setInterval(() => {
     const agora = new Date();
     const segs = agora.getSeconds();
@@ -43,7 +43,7 @@ setInterval(() => {
 
         if (d.emOperacao) return;
 
-        // 1. ANÁLISE (Gatilho de Força)
+        // 1. ANÁLISE
         if (segs === 50 && d.ultimoMinuto !== minAtual) {
             const forcaReal = Math.floor(Math.random() * 31) + 70; 
             if (forcaReal >= 70) {
@@ -55,23 +55,22 @@ setInterval(() => {
             }
         }
 
-        // 2. CONFIRMAÇÃO (Agora configurado para 20% de Retração - Mais Frequente)
+        // 2. CONFIRMAÇÃO (Busca 20% de Retração)
         if (d.gatilhoRusso && segs > 0 && segs <= 30 && !d.buscaRetracao) {
-            // Aumentamos a chance de confirmação (simulando que 20% toca mais rápido)
-            const tocouNaTaxa = Math.random() > 0.2; 
+            const tocouNaTaxa = Math.random() > 0.4; // 60% de chance de bater a taxa
             
             if (tocouNaTaxa) {
                 d.buscaRetracao = true;
                 d.gatilhoRusso = false;
                 const tempoParaFechar = (60 - segs) * 1000;
-                
                 enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 **CLIQUE AGORA**\n💎 *${ativo}*\n🎯 *SINAL:* ${d.direcao}\n⏱ *EXPIRAÇÃO:* M1`);
-                
                 verificarResultadoM1(ativo, d.direcao, tempoParaFechar);
             }
         }
 
-        if (segs > 30 && d.gatilhoRusso) {
+        // 3. ANÁLISE ABORTADA (Se passar de 30s sem tocar na taxa)
+        if (segs === 31 && d.gatilhoRusso && !d.buscaRetracao) {
+            enviarTelegram(`❌ *ANÁLISE ABORTADA: ${ativo}*\n⚠️ *MOTIVO:* Taxa de entrada não atingida.`, false);
             d.gatilhoRusso = false;
             d.buscaRetracao = false;
         }
@@ -82,8 +81,7 @@ function verificarResultadoM1(ativo, direcao, tempoParaFechar) {
     const d = dadosAtivos[ativo];
     d.emOperacao = true;
     setTimeout(() => {
-        const sorte = Math.random();
-        if (sorte > 0.4) {
+        if (Math.random() > 0.4) {
             d.wins++; global.wins++;
             enviarTelegram(`✅ *WIN DIRETO: ${ativo}*`, false);
             d.emOperacao = false; d.buscaRetracao = false;
@@ -103,7 +101,7 @@ function verificarResultadoM1(ativo, direcao, tempoParaFechar) {
     }, tempoParaFechar);
 }
 
-// RELATÓRIO 5 MIN
+// RELATÓRIO E ROTAS
 setInterval(() => {
     const totalGlobal = global.wins + global.g1 + global.loss + global.redGale;
     const efGlobal = totalGlobal > 0 ? (((global.wins + global.g1) / totalGlobal) * 100).toFixed(1) : "0.0";
@@ -111,10 +109,7 @@ setInterval(() => {
 }, 300000);
 
 app.get('/lista-ativos', (req, res) => res.json(listaAtivos));
-app.post('/selecionar-ativo', (req, res) => { 
-    ativosSelecionados[req.body.index] = req.body.ativo; 
-    res.json({ status: "ok" }); 
-});
+app.post('/selecionar-ativo', (req, res) => { ativosSelecionados[req.body.index] = req.body.ativo; res.json({ status: "ok" }); });
 app.get('/dados', (req, res) => {
     const resp = ativosSelecionados.map(a => {
         if (a === "NENHUM") return { nome: "DESATIVADO", wins: 0, loss: 0, forca: 0 };
