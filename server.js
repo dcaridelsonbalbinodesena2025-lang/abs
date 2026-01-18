@@ -89,7 +89,7 @@ function processarTick(id, preco) {
     const m = motores[id]; if (!m) return;
     m.precoAtual = preco;
     const segs = new Date().getSeconds();
-    const txtSinal = (s) => s === "CALL" ? "🟢 COMPRA (CALL)" : "🔴 VENDA (PUT)";
+    const txtSinal = (s) => s === "CALL" ? "🟢 COMPRA" : "🔴 VENDA";
 
     if (m.aberturaVela > 0) {
         let diff = preco - m.aberturaVela;
@@ -102,7 +102,7 @@ function processarTick(id, preco) {
         let alvo = diffV * 0.20; 
         if ((m.sinalPendente === "CALL" && preco <= (m.aberturaVela - alvo)) || (m.sinalPendente === "PUT" && preco >= (m.aberturaVela + alvo))) {
             m.operacaoAtiva = m.sinalPendente; m.precoEntrada = preco; m.tempoOp = (60 - segs); m.buscandoTaxa = false;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${txtSinal(m.operacaoAtiva)}${gerarPlacarMsg(id)}`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${txtSinal(m.operacaoAtiva)}${gerarPlacarMsg(id)}`);
         }
     }
 
