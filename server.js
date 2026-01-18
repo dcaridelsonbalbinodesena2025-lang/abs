@@ -74,7 +74,7 @@ function conectarDeriv() {
 
 async function enviarTelegram(msg, comBotao = true) {
     const payload = { chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown" };
-    if (comBotao) payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR AGORA", url: LINK_CORRETORA }]] };
+    if (comBotao) payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR AGORA NA DERIV", url: LINK_CORRETORA }]] };
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
