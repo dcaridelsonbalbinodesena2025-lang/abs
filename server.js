@@ -141,7 +141,7 @@ function processarTick(id, preco) {
 
         if (sinalFinal && !m.operacaoAtiva) {
             m.operacaoAtiva = sinalFinal; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *TAXA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
         } 
         else if (m.analiseEnviada && !sinalFinal && !m.operacaoAtiva) {
             enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA*\nO ativo ${m.nome} não buscou a taxa de segurança. Não entre!`, false);
