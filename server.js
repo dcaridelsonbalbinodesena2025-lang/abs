@@ -5,54 +5,59 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
+// --- CONFIGURAÇÕES DO TELEGRAM E CORRETORA ---
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 const LINK_IQ = "https://iqoption.com/trader";
 
-const listaAtivos = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "EUR/JPY", "EUR/USD-OTC", "GBP/USD-OTC", "USD/JPY-OTC"];
-let ativosSelecionados = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD"];
+// --- LISTA DE ATIVOS (COM OPÇÃO DE DESATIVAR) ---
+const listaAtivos = ["NENHUM", "USD/CHF" , "USD/NR" , "GPZ/NZD" , "EUR/USD", "AUD/JPY" , "GBP/USD", "USD/JPY", "AUD/USD", "EUR/JPY", "USD/PH" , "NZD/USD", "NZD/USD-OTC" ,  "USD/PH-OTC" , "EUR/USD-OTC", "GBP/USD-OTC", "USD/JPY-OTC" , "AUD/JPY-OTC" , "USD/NR-OTC" , "GPZ/NZD-OTC" , "USD/CHF-OTC" ];
+let ativosSelecionados = ["EUR/USD", "GBP/USD", "NENHUM", "NENHUM"]; 
 
+// --- PLACARES GLOBAIS E POR ATIVO ---
 let global = { analises: 0, wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0 };
 let dadosAtivos = {};
 listaAtivos.forEach(a => {
     dadosAtivos[a] = { wins: 0, loss: 0, g1: 0, g2: 0, redGale: 0, gatilho: false, direcao: "", ultimoMinuto: -1 };
 });
 
+// --- FUNÇÃO DE ENVIO PARA TELEGRAM ---
 async function enviarTelegram(msg, comBotao = true) {
     const payload = { chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown" };
     if (comBotao) {
-        payload.reply_markup = { inline_keyboard: [[{ text: "📲 OPERAR AGORA", url: LINK_IQ }]] };
+        payload.reply_markup = { 
+            inline_keyboard: [[{ text: "📲 OPERAR NA IQ OPTION", url: LINK_IQ }]] 
+        };
     }
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
+// --- CÁLCULOS DE EFICIÊNCIA E RANKING ---
 function calcEficiencia(nome) {
+    if (nome === "NENHUM") return "0.0";
     const d = dadosAtivos[nome];
     const t = d.wins + d.g1 + d.g2 + d.loss + d.redGale;
     return t > 0 ? (((d.wins + d.g1 + d.g2) / t) * 100).toFixed(1) : "0.0";
 }
 
-// FUNÇÃO DO RELATÓRIO GRANDE (CHAMADA AGORA PELO TIMER DE 5 MINUTOS)
+// --- RELATÓRIO DE 5 EM 5 MINUTOS ---
 function enviarRelatorioPeriodico() {
     const totalGlobal = global.wins + global.loss + global.g1 + global.g2 + global.redGale;
     const efGlobal = totalGlobal > 0 ? (((global.wins + global.g1 + global.g2) / totalGlobal) * 100).toFixed(1) : "0.0";
-    const maisGale = Object.keys(dadosAtivos).reduce((a, b) => 
-        (dadosAtivos[a].g1 + dadosAtivos[a].g2) > (dadosAtivos[b].g1 + dadosAtivos[b].g2) ? a : b);
-
+    
     const ranking = Object.keys(dadosAtivos)
+        .filter(nome => nome !== "NENHUM")
         .map(nome => ({ nome, ef: parseFloat(calcEficiencia(nome)) }))
         .sort((a, b) => b.ef - a.ef)
         .slice(0, 2)
         .map((r, i) => `🏆 ${i+1}º ${r.nome}: ${r.ef}%`).join("\n");
 
-    const mensagem = `📊 *RELATÓRIO DE PERFORMANCE (5 MIN)*\n\n📈 *GERAL DA SESSÃO:*\n\`• Análises: ${global.analises}\` \n\`• Wins Diretos: ${global.wins}\` \n\`• Losses Diretos: ${global.loss}\` \n\`• Wins c/ Gale: ${global.g1 + global.g2}\` \n\`• Reds c/ Gale: ${global.redGale}\` \n\n🚨 *ALERTA:* \n\`• +Gales em: ${maisGale}\` \n\n🏆 *TOP RANKING:* \n${ranking} \n\n🔥 *EFICIÊNCIA ROBO: ${efGlobal}%*`;
-    
+    const mensagem = `📊 *RELATÓRIO DE PERFORMANCE (5 MIN)*\n\n📈 *GERAL DA SESSÃO:*\n\`• Análises: ${global.analises}\` \n\`• Wins Diretos: ${global.wins}\` \n\`• Losses Diretos: ${global.loss}\` \n\`• Wins c/ Gale: ${global.g1 + global.g2}\` \n\`• Reds c/ Gale: ${global.redGale}\` \n\n🏆 *TOP RANKING:* \n${ranking} \n\n🔥 *EFICIÊNCIA ROBO: ${efGlobal}%*`;
     enviarTelegram(mensagem, false);
 }
+setInterval(enviarRelatorioPeriodico, 300000); // 300 mil milisegundos = 5 min
 
-// TIMER FIXO: ENVIA O RELATÓRIO A CADA 5 MINUTOS (300.000 ms)
-setInterval(enviarRelatorioPeriodico, 300000);
-
+// --- LÓGICA DE RESULTADOS (WIN/GALE/RED) ---
 function verificarResultadoFinal(ativo, direcao) {
     const d = dadosAtivos[ativo];
     setTimeout(() => {
@@ -83,12 +88,15 @@ function verificarResultadoFinal(ativo, direcao) {
     }, 60000);
 }
 
+// --- CICLO PRINCIPAL (ANÁLISE E ENTRADA) ---
 setInterval(() => {
     const agora = new Date();
     const segs = agora.getSeconds();
     const minAtual = agora.getMinutes();
 
     ativosSelecionados.forEach(ativo => {
+        if (ativo === "NENHUM") return; 
+
         const d = dadosAtivos[ativo];
         if (d.ultimoMinuto === minAtual) return;
 
@@ -101,27 +109,30 @@ setInterval(() => {
         }
 
         if (segs === 0 && d.gatilho) {
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉CLIQUE AGORA\n💎 *${ativo}* | *${d.direcao}*`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n💎 *${ativo}* | *${d.direcao}*`);
             d.gatilho = false;
             verificarResultadoFinal(ativo, d.direcao);
         }
     });
 }, 1000);
 
-// ROTAS DO PAINEL
+// --- ROTAS DO PAINEL WEB ---
 app.get('/lista-ativos', (req, res) => res.json(listaAtivos));
 app.post('/selecionar-ativo', (req, res) => {
     ativosSelecionados[req.body.index] = req.body.ativo;
     res.json({ status: "ok" });
 });
 app.get('/dados', (req, res) => {
-    const resp = ativosSelecionados.map(a => ({
-        nome: a,
-        wins: dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2,
-        loss: dadosAtivos[a].loss + dadosAtivos[a].redGale,
-        forca: Math.floor(Math.random() * 10) + 85
-    }));
+    const resp = ativosSelecionados.map(a => {
+        if (a === "NENHUM") return { nome: "DESATIVADO", wins: 0, loss: 0, forca: 0 };
+        return {
+            nome: a,
+            wins: dadosAtivos[a].wins + dadosAtivos[a].g1 + dadosAtivos[a].g2,
+            loss: dadosAtivos[a].loss + dadosAtivos[a].redGale,
+            forca: Math.floor(Math.random() * 10) + 85
+        };
+    });
     res.json(resp);
 });
 
-app.listen(process.env.PORT || 3000);
+app.listen(process.env.PORT || 3000, () => console.log("Robô Rodando!"));
