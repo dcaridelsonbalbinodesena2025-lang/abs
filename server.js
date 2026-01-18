@@ -65,7 +65,7 @@ function gerarPlacarMsg(id) {
     const m = motores[id];
     const totalW = statsDia.winDireto + statsDia.winGales;
     const assert = statsDia.analises > 0 ? ((totalW / statsDia.analises) * 100).toFixed(1) : "0";
-    return `\n\n🏆 *PLACAR ATUAL*\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL:* ${totalW}W - ${statsDia.loss}L (${assert}%)`;
+    return `\n\n🏆 *PLACAR ATUAL*\n📊 *ATIVO:* ${m.wins}W - ${m.loss}L\n🌍 *GLOBAL:* ${totalW}W - ${statsDia.loss}L\n🔥 EFICIÊNCIA:(${assert}%)`;
 }
 
 function processarTick(id, preco) {
@@ -100,7 +100,7 @@ function processarTick(id, preco) {
 
         if (sinalFinal && !m.operacaoAtiva) {
             m.operacaoAtiva = sinalFinal; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *TAXA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n\n💎 *Ativo:* ${m.nome}\n🎯 *Sinal:* ${direcaoTxt(sinalFinal)}${gerarPlacarMsg(id)}`, false);
         } 
         else if (m.analiseEnviada && !sinalFinal && !m.operacaoAtiva) {
             enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA*\nO ativo ${m.nome} não confirmou a taxa de segurança.`, false);
