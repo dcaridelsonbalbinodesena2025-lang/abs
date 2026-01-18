@@ -7,7 +7,7 @@ const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 
-// --- LISTA MASSIVA COMPLETA (NÃO DIMINUI MAIS) ---
+// --- LISTA MASSIVA COMPLETA ---
 const LISTA_ATIVOS = [
     { id: "NONE", nome: "❌ NENHUM (DESATIVAR)" },
     { id: "1HZ10V", nome: "Volatility 10 (1s)" }, { id: "1HZ25V", nome: "Volatility 25 (1s)" },
@@ -23,11 +23,8 @@ const LISTA_ATIVOS = [
     { id: "CRASH500", nome: "Crash 500" }, { id: "CRASH1000", nome: "Crash 1000" },
     { id: "frxEURUSD", nome: "EUR/USD" }, { id: "frxGBPUSD", nome: "GBP/USD" },
     { id: "frxUSDJPY", nome: "USD/JPY" }, { id: "frxAUDUSD", nome: "AUD/USD" },
-    { id: "frxUSDCAD", nome: "USD/CAD" }, { id: "frxUSDCHF", nome: "USD/CHF" },
-    { id: "frxEURGBP", nome: "EUR/GBP" }, { id: "frxEURJPY", nome: "EUR/JPY" },
-    { id: "frxGBPJPY", nome: "GBP/JPY" }, { id: "frxXAUUSD", nome: "OURO (XAU/USD)" },
-    { id: "cryBTCUSD", nome: "BITCOIN (BTC)" }, { id: "cryETHUSD", nome: "ETHEREUM (ETH)" },
-    { id: "cryLTCUSD", nome: "LITECOIN (LTC)" }, { id: "cryXRPUSD", nome: "RIPPLE (XRP)" }
+    { id: "frxXAUUSD", nome: "OURO (XAU/USD)" },
+    { id: "cryBTCUSD", nome: "BITCOIN (BTC)" }, { id: "cryETHUSD", nome: "ETHEREUM (ETH)" }
 ];
 
 let globalStats = { analises: 0, winDireto: 0, winGales: 0, loss: 0 };
@@ -122,15 +119,8 @@ function processarTick(id, preco) {
     }
 }
 
-setInterval(() => {
-    if (globalStats.analises === 0) return;
-    const totalW = globalStats.winDireto + globalStats.winGales;
-    const assert = ((totalW / globalStats.analises) * 100).toFixed(1);
-    let rank = Object.values(motores).filter(m => (m.wins + m.loss) > 0).sort((a,b) => b.wins - a.wins).slice(0, 3).map((it, i) => `${i+1}º ${it.nome}: ${it.wins}W`).join("\n");
-    enviarTelegram(`📊 *RELATÓRIO DE PERFORMANCE*\n\n🌍 *GLOBAL:* ${totalW}W - ${globalStats.loss}L\n🎯 *ASSERTIVIDADE:* ${assert}%\n🏆 *TOP ATIVOS:*\n${rank}`, false);
-}, 300000);
-
 app.get('/api/status', (req, res) => res.json({ slots, motores, globalStats }));
+
 app.get('/mudar/:index/:novoId', (req, res) => {
     const { index, novoId } = req.params;
     const antigoId = slots[index];
@@ -145,19 +135,41 @@ app.get('/mudar/:index/:novoId', (req, res) => {
 app.get('/', (req, res) => {
     let options = LISTA_ATIVOS.map(a => `<option value="${a.id}">${a.nome}</option>`).join('');
     res.send(`<!DOCTYPE html><html><head><title>KCM V19</title><meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>body{background:#05070a; color:white; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; padding:15px;}
-    .card{background:#111418; padding:15px; border-radius:15px; border:1px solid #333; margin-bottom:10px; transition:0.3s;}</style>
+    <style>
+        body{background:#05070a; color:white; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; padding:15px;}
+        .card{background:#111418; padding:15px; border-radius:15px; border:1px solid #333; margin-bottom:10px; transition:0.3s;}
+        .termometro-bg{height:4px; background:#222; margin:10px 0; border-radius:2px; overflow:hidden;}
+        .termometro-bar{height:100%; transition: 0.5s; background:linear-gradient(90deg, #ff3355, #00ff88);}
+    </style></head>
     <body><h3>K.C<span style="color:#1e90ff">📈</span>M ULTIMATE</h3>
     <div style="width:100%; max-width:450px; background:#0a0c0f; border:2px solid #1e90ff; border-radius:20px; padding:15px">
-        <div id="grid-cards" style="display:grid; grid-template-columns:1fr 1fr; gap:10px">${slots.map((id, i) => `
-            <div class="card" id="card-${i}">
-                <div style="font-size:10px; color:#1e90ff" id="nome-${i}">Carregando...</div>
-                <div style="font-size:16px; font-weight:bold; margin:5px 0" id="preco-${i}">---</div>
-                <select onchange="window.location.href='/mudar/${i}/'+this.value" style="width:100%; background:#000; color:#fff; font-size:10px"><option value="">Trocar...</option>${options}</select>
-            </div>`).join('')}</div>
+        <div id="grid-cards" style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+            ${slots.map((id, i) => `
+                <div class="card" id="card-${i}">
+                    <div style="font-size:10px; color:#1e90ff" id="nome-${i}">Carregando...</div>
+                    <div style="font-size:16px; font-weight:bold; margin:5px 0" id="preco-${i}">---</div>
+                    <div class="termometro-bg"><div class="termometro-bar" id="bar-${i}" style="width:50%"></div></div>
+                    <select onchange="window.location.href='/mudar/${i}/'+this.value" style="width:100%; background:#000; color:#fff; font-size:10px">
+                        <option value="">Trocar...</option>${options}
+                    </select>
+                </div>`).join('')}
+        </div>
         <div id="placar" style="background:#000; padding:10px; border-radius:10px; margin-top:10px; font-size:12px; color:#1e90ff; text-align:center">📊 PLACAR: 0W - 0L</div>
     </div>
-    <script>async function up(){const r=await fetch('/api/status'); const d=await r.json(); d.slots.forEach((id,i)=>{const m=d.motores[id]||{nome:"OFF", precoAtual:0}; document.getElementById('nome-'+i).innerText=m.nome; document.getElementById('preco-'+i).innerText=id==="NONE"?"---":m.precoAtual.toFixed(4); document.getElementById('card-'+i).style.opacity=id==="NONE"?"0.5":"1";}); document.getElementById('placar').innerText="📊 PLACAR GLOBAL: "+(d.globalStats.winDireto+d.globalStats.winGales)+"W - "+d.globalStats.loss+"L";} setInterval(up, 2000);</script></body></html>`);
+    <script>
+        async function up(){
+            const r=await fetch('/api/status'); const d=await r.json(); 
+            d.slots.forEach((id,i)=>{
+                const m=d.motores[id]||{nome:"OFF", precoAtual:0, forca:50}; 
+                document.getElementById('nome-'+i).innerText=m.nome; 
+                document.getElementById('preco-'+i).innerText=id==="NONE"?"---":m.precoAtual.toFixed(4); 
+                document.getElementById('bar-'+i).style.width = m.forca + "%";
+                document.getElementById('card-'+i).style.opacity=id==="NONE"?"0.5":"1";
+            }); 
+            document.getElementById('placar').innerText="📊 PLACAR GLOBAL: "+(d.globalStats.winDireto+d.globalStats.winGales)+"W - "+d.globalStats.loss+"L";
+        } 
+        setInterval(up, 2000);
+    </script></body></html>`);
 });
 
 inicializarMotores(); conectarDeriv(); app.listen(process.env.PORT || 3000);
