@@ -71,68 +71,70 @@ const LISTA_ATIVOS = [
 
 
 let statsDiario = { analises: 0, winDireto: 0, lossDireto: 0, winGale: 0, lossGale: 0, ativos: {} };
+let historico = []; 
 let motores = {};
-let slots = ["1HZ100V", "R_100", "frxEURUSD", "1HZ10V"];
+let slots = ["1HZ100V", "R_100", "frxEURUSD", "cryBTCUSD"];
 
-// --- NOVO VISUAL MODERNO (SUBSTITUINDO O ANTIGO) ---
+// --- RELATÓRIO DE PERFORMANCE (A CADA 5 MINUTOS) ---
+setInterval(() => {
+    if (statsDiario.analises === 0) return;
+    let winsTotais = statsDiario.winDireto + statsDiario.winGale;
+    let efGeral = ((winsTotais / statsDiario.analises) * 100).toFixed(1);
+    let ranking = Object.keys(statsDiario.ativos).map(nome => {
+        let a = statsDiario.ativos[nome];
+        let porc = (a.w + a.l) > 0 ? ((a.w / (a.w + a.l)) * 100).toFixed(0) : 0;
+        return { nome, porc: parseInt(porc) };
+    }).sort((a, b) => b.porc - a.porc).slice(0, 4);
+
+    let msg = `📊 *RELATÓRIO DE PERFORMANCE*\n\n📈 *GERAL:*\n• Análises: ${statsDiario.analises}\n• Wins Diretos: ${statsDiario.winDireto}\n• Losses Diretos: ${statsDiario.lossDireto}\n• Wins c/ Gale: ${statsDiario.winGale}\n• Reds c/ Gale: ${statsDiario.lossGale}\n\n🏆 *RANKING ATIVOS:*\n` + 
+              ranking.map((a, i) => `${i + 1}º ${a.nome}: ${a.porc}%`).join('\n') + 
+              `\n\n🔥 *EFICIÊNCIA ROBÔ: ${efGeral}%*`;
+    enviarTelegram(msg);
+}, 5 * 60 * 1000);
+
+// --- PAINEL VISUAL ---
 app.get('/', (req, res) => {
-    // Processa troca de ativo via painel
     if (req.query.slotIdx !== undefined && req.query.ativoId) {
         slots[parseInt(req.query.slotIdx)] = req.query.ativoId;
         reiniciarWS();
     }
-
     const segs = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"})).getSeconds();
     const timerGeral = (60 - segs).toString().padStart(2, '0');
-
     let winsTotal = statsDiario.winDireto + statsDiario.winGale;
-    let lossTotal = statsDiario.lossDireto + statsDiario.lossGale;
     let eficiencia = statsDiario.analises > 0 ? ((winsTotal / statsDiario.analises) * 100).toFixed(1) : 0;
 
     res.send(`
-    <!DOCTYPE html>
-    <html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>K.C.M V19 - PAINEL</title>
-        <style>
-            :root { --neon-blue: #1e90ff; --neon-green: #00ff88; --neon-red: #ff3355; --bg-dark: #05070a; }
-            body { background: var(--bg-dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
-            .header { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1e2228; padding-bottom: 10px; }
-            .logo { font-size: 20px; font-weight: 900; } .logo span { color: var(--neon-blue); }
-            .stats-global { display: flex; gap: 15px; background: #111418; padding: 10px 20px; border-radius: 50px; border: 1px solid #1e90ff; }
-            .stat-item { text-align: center; font-size: 12px; } .stat-val { font-weight: bold; display: block; font-size: 16px; }
-            .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; }
-            .card { background: #111418; border-radius: 15px; padding: 15px; border: 1px solid #1e2228; text-align: center; position: relative; transition: 0.3s; }
-            .card.active { border-color: var(--neon-green); box-shadow: 0 0 10px rgba(0,255,136,0.2); }
-            .card-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 5px; }
-            .thermometer-wrap { width: 100%; height: 6px; background: #222; border-radius: 3px; margin: 10px 0; overflow: hidden; }
-            .thermometer-fill { height: 100%; transition: 0.5s; background: linear-gradient(90deg, var(--neon-red), var(--neon-green)); }
-            .timer-large { font-size: 38px; font-weight: bold; margin: 5px 0; color: #fff; }
-            .status-tag { font-size: 9px; padding: 3px 8px; border-radius: 10px; background: #222; color: #aaa; }
-            select { background: #000; color: #fff; border: 1px solid #1e90ff; width: 100%; padding: 8px; border-radius: 8px; margin-top: 10px; font-size: 12px; }
-        </style>
-        <script>setTimeout(() => { if(!window.location.search) location.reload(); }, 2000);</script>
-    </head>
-    <body>
+    <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>K.C.M V19</title>
+    <style>
+        :root { --neon-blue: #1e90ff; --neon-green: #00ff88; --neon-red: #ff3355; --bg-dark: #05070a; }
+        body { background: var(--bg-dark); color: white; font-family: sans-serif; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .header { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1e2228; padding-bottom: 10px; }
+        .stats-global { display: flex; gap: 10px; background: #111418; padding: 10px; border-radius: 50px; border: 1px solid var(--neon-blue); }
+        .stat-item { text-align: center; font-size: 10px; } .stat-val { font-weight: bold; display: block; font-size: 14px; }
+        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; }
+        .card { background: #111418; border-radius: 15px; padding: 15px; border: 1px solid #1e2228; text-align: center; }
+        .card.active { border-color: var(--neon-green); box-shadow: 0 0 10px rgba(0,255,136,0.2); }
+        .timer-large { font-size: 38px; font-weight: bold; margin: 5px 0; }
+        select { background: #000; color: #fff; border: 1px solid var(--neon-blue); width: 100%; padding: 8px; border-radius: 8px; font-size: 11px; }
+        .history-panel { width: 100%; max-width: 600px; margin-top: 20px; background: #111418; border-radius: 15px; padding: 15px; border: 1px solid #1e2228; }
+        .history-item { display: flex; justify-content: space-between; font-size: 11px; padding: 5px 0; border-bottom: 1px solid #1a1a1a; }
+    </style>
+    <script>setTimeout(() => { if(!window.location.search) location.reload(); }, 2000);</script>
+    </head><body>
         <div class="header">
-            <div class="logo">K.C<span>📈</span>M V19</div>
+            <div style="font-weight:900">K.C<span style="color:var(--neon-blue)">📈</span>M V19</div>
             <div class="stats-global">
                 <div class="stat-item"><span class="stat-val">${statsDiario.analises}</span>ANÁLISES</div>
                 <div class="stat-item"><span class="stat-val" style="color:var(--neon-green)">${winsTotal}</span>WINS</div>
-                <div class="stat-item"><span class="stat-val" style="color:var(--neon-red)">${lossTotal}</span>LOSS</div>
+                <div class="stat-item"><span class="stat-val" style="color:var(--neon-red)">${statsDiario.lossDireto + statsDiario.lossGale}</span>LOSS</div>
                 <div class="stat-item"><span class="stat-val">${eficiencia}%</span>ASSERT.</div>
             </div>
         </div>
         <div class="grid-container">
             ${slots.map((idAtivo, i) => {
-                const m = motores[idAtivo] || { forca: 50, operacaoAtiva: false };
-                return `
-                <div class="card ${m.operacaoAtiva ? 'active' : ''}">
-                    <div class="card-label">FORÇA DO MERCADO</div>
-                    <div class="thermometer-wrap"><div class="thermometer-fill" style="width: ${m.forca}%"></div></div>
-                    <div class="status-tag">${m.operacaoAtiva ? '🔥 OPERANDO' : (m.buscandoTaxa ? '⏳ AGUARD. TAXA' : '🔍 ANALISANDO')}</div>
+                const m = motores[idAtivo] || { forca: 50 };
+                return `<div class="card ${m.operacaoAtiva ? 'active' : ''}">
+                    <div style="font-size:9px;color:#888">FORÇA</div>
                     <div class="timer-large">${timerGeral}</div>
                     <form action="/" method="get">
                         <input type="hidden" name="slotIdx" value="${i}">
@@ -140,23 +142,20 @@ app.get('/', (req, res) => {
                             ${LISTA_ATIVOS.map(a => `<option value="${a.id}" ${a.id === idAtivo ? 'selected' : ''}>${a.nome}</option>`).join('')}
                         </select>
                     </form>
-                </div>`;
-            }).join('')}
+                </div>`}).join('')}
+        </div>
+        <div class="history-panel">
+            <div style="font-size:11px;color:var(--neon-blue);margin-bottom:8px">HISTÓRICO RECENTE</div>
+            ${historico.map(h => `<div class="history-item"><span>${h.hora} - ${h.ativo}</span><span style="color:${h.res==='WIN'?'#0f8':'#f35'}">${h.res}</span></div>`).join('')}
         </div>
     </body></html>`);
 });
 
-// --- LÓGICA DE OPERAÇÃO (MANTIDA IGUAL AO SEU CÓDIGO) ---
 function inicializarMotores() {
     slots.forEach(id => {
         if (id !== "NONE" && !motores[id]) {
             const info = LISTA_ATIVOS.find(a => a.id === id);
-            motores[id] = { 
-                nome: info ? info.nome : id, wins: 0, loss: 0, 
-                aberturaVelaAtual: 0, corpoVelaAnterior: 0, fechamentoVelaAnterior: 0,
-                forca: 50, operacaoAtiva: null, galeAtual: 0, tempoOp: 0, precoEntrada: 0,
-                buscandoTaxa: false, sinalPendente: null
-            };
+            motores[id] = { nome: info ? info.nome : id, aberturaVelaAtual: 0, corpoVelaAnterior: 0, fechamentoVelaAnterior: 0, forca: 50, operacaoAtiva: null, galeAtual: 0, tempoOp: 0, precoEntrada: 0, buscandoTaxa: false, sinalPendente: null };
         }
     });
 }
@@ -168,52 +167,34 @@ function getHoraBR(offsetSegundos = 0) {
 }
 
 async function enviarTelegram(msg) {
-    const payload = {
-        chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown",
-        disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: [[{ text: "📲 DERIV.COM", url: LINK_CORRETORA }]] }
-    };
+    const payload = { chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[{ text: "📲 DERIV.COM", url: LINK_CORRETORA }]] } };
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
 
 function registrarResultado(ativoNome, resultado, foiGale) {
-    if (resultado === "WIN") {
-        if (foiGale) statsDiario.winGale++; else statsDiario.winDireto++;
-    } else {
-        if (foiGale) statsDiario.lossGale++; else statsDiario.lossDireto++;
-    }
+    if (!statsDiario.ativos[ativoNome]) statsDiario.ativos[ativoNome] = { w: 0, l: 0 };
+    if (resultado === "WIN") { if (foiGale) statsDiario.winGale++; else statsDiario.winDireto++; statsDiario.ativos[ativoNome].w++; } 
+    else { if (foiGale) statsDiario.lossGale++; else statsDiario.lossDireto++; statsDiario.ativos[ativoNome].l++; }
     statsDiario.analises++;
+    historico.unshift({ hora: getHoraBR(), ativo: ativoNome, res: resultado });
+    if (historico.length > 5) historico.pop();
 }
 
 function processarTick(id, preco) {
     const m = motores[id]; if (!m) return;
     const segs = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"})).getSeconds();
-    
-    if (m.aberturaVelaAtual > 0) {
-        m.forca = 50 + ((preco - m.aberturaVelaAtual) / (m.aberturaVelaAtual * 0.0002) * 20);
-        m.forca = Math.min(98, Math.max(2, m.forca));
-    }
+    if (m.aberturaVelaAtual > 0) { m.forca = 50 + ((preco - m.aberturaVelaAtual) / (m.aberturaVelaAtual * 0.0002) * 20); m.forca = Math.min(98, Math.max(2, m.forca)); }
 
-    if (!m.operacaoAtiva && !m.buscandoTaxa && segs === 0 && m.aberturaVelaAtual !== preco) {
-        let dirPrevista = m.forca >= 50 ? "🟢 COMPRA" : "🔴 VENDA";
-        enviarTelegram(`🔍 *BUSCANDO POSSÍVEL ENTRADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${dirPrevista}`);
-        
-        setTimeout(() => {
-            if (m.forca >= FORCA_MINIMA || m.forca <= (100 - FORCA_MINIMA)) {
-                m.sinalPendente = m.forca >= FORCA_MINIMA ? "CALL" : "PUT";
-                m.buscandoTaxa = true;
-            }
-        }, 1200);
-        m.corpoVelaAnterior = Math.abs(preco - m.aberturaVelaAtual);
-        m.fechamentoVelaAnterior = preco; m.aberturaVelaAtual = preco;
+    if (!m.operacaoAtiva && !m.buscandoTaxa && segs === 0) {
+        if (m.forca >= FORCA_MINIMA || m.forca <= (100 - FORCA_MINIMA)) { m.sinalPendente = m.forca >= FORCA_MINIMA ? "CALL" : "PUT"; m.buscandoTaxa = true; }
+        m.corpoVelaAnterior = Math.abs(preco - m.aberturaVelaAtual); m.fechamentoVelaAnterior = preco; m.aberturaVelaAtual = preco;
     }
 
     if (m.buscandoTaxa && segs < 30) {
         const dist = m.corpoVelaAnterior * (PCT_RECUO_TAXA / 100);
-        if ((m.sinalPendente === "CALL" && preco <= (m.fechamentoVelaAnterior - dist)) || 
-            (m.sinalPendente === "PUT" && preco >= (m.fechamentoVelaAnterior + dist))) {
+        if ((m.sinalPendente === "CALL" && preco <= (m.fechamentoVelaAnterior - dist)) || (m.sinalPendente === "PUT" && preco >= (m.fechamentoVelaAnterior + dist))) {
             m.buscandoTaxa = false; m.operacaoAtiva = m.sinalPendente; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${m.nome}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
         }
     }
 
@@ -223,14 +204,16 @@ function processarTick(id, preco) {
             const win = (m.operacaoAtiva === "CALL" && preco > m.precoEntrada) || (m.operacaoAtiva === "PUT" && preco < m.precoEntrada);
             if (win) {
                 registrarResultado(m.nome, "WIN", m.galeAtual > 0);
-                enviarTelegram(`✅ *GREEN: ${m.nome}*`);
+                let pA = statsDiario.ativos[m.nome];
+                enviarTelegram(`✅ *GREEN: ${m.nome}*\n🏆 Resultado: ${m.galeAtual > 0 ? 'GALE '+m.galeAtual : 'DIRETO'}\n📊 ATIVO: ${pA.w}W - ${pA.l}L\n🌍 GLOBAL: ${statsDiario.winDireto + statsDiario.winGale}W - ${statsDiario.lossDireto + statsDiario.lossGale}L`);
                 m.operacaoAtiva = null; m.galeAtual = 0;
             } else if (m.galeAtual < 2) {
                 m.galeAtual++; m.precoEntrada = preco; m.tempoOp = 60; 
-                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*`);
+                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
             } else {
                 registrarResultado(m.nome, "LOSS", true);
-                enviarTelegram(`❌ *LOSS FINAL: ${m.nome}*`);
+                let pA = statsDiario.ativos[m.nome];
+                enviarTelegram(`❌ *LOSS FINAL: ${m.nome}*\n📊 ATIVO: ${pA.w}W - ${pA.l}L\n🌍 GLOBAL: ${statsDiario.winDireto + statsDiario.winGale}W - ${statsDiario.lossDireto + statsDiario.lossGale}L`);
                 m.operacaoAtiva = null; m.galeAtual = 0;
             }
         }
@@ -240,14 +223,9 @@ function processarTick(id, preco) {
 let ws;
 function conectar(){
     ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
-    ws.on('open', () => {
-        inicializarMotores();
-        slots.forEach(id => id!=="NONE" && ws.send(JSON.stringify({ticks:id})));
-    });
+    ws.on('open', () => { inicializarMotores(); slots.forEach(id => id!=="NONE" && ws.send(JSON.stringify({ticks:id}))); });
     ws.on('message', data => { const r=JSON.parse(data); if(r.tick) processarTick(r.tick.symbol, r.tick.quote); });
     ws.on('close', () => setTimeout(conectar, 5000));
 }
 function reiniciarWS() { if(ws) ws.close(); }
-
-conectar(); 
-app.listen(process.env.PORT || 3000);
+conectar(); app.listen(process.env.PORT || 3000);
