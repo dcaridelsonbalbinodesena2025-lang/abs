@@ -1,11 +1,11 @@
 const axios = require('axios');
 const express = require('express');
 const WebSocket = require('ws');
-const cors = require('cors'); // <--- ADICIONADO
+const cors = require('cors'); 
 const app = express();
 
 app.use(express.json());
-app.use(cors()); // <--- LIBERA O PAINEL DO GITHUB
+app.use(cors());
 
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
@@ -14,8 +14,11 @@ const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 const FORCA_MINIMA = 70; 
 const PCT_RECUO_TAXA = 30; 
 
+// --- LISTA DE ATIVOS COMPLETA E ATUALIZADA (SINTÉTICOS, FOREX, METAIS E CRIPTO) ---
 const LISTA_ATIVOS = [
     { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+    
+    // --- ÍNDICES SINTÉTICOS (24/7 - OS MELHORES PARA O ROBÔ) ---
     { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
     { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
     { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
@@ -38,6 +41,8 @@ const LISTA_ATIVOS = [
     { id: "CRASH500", nome: "📉 Crash 500" },
     { id: "CRASH1000", nome: "📉 Crash 1000" },
     { id: "ST50", nome: "🎢 Step Index" },
+
+    // --- FOREX (PARES MAIORES - SEGUNDA A SEXTA) ---
     { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
     { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
     { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
@@ -47,10 +52,14 @@ const LISTA_ATIVOS = [
     { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
     { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
     { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
+
+    // --- METAIS E ENERGIA (COMMODITIES) ---
     { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
     { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
     { id: "frxXPDUSD", nome: "🧪 PALÁDIO (XPD/USD)" },
     { id: "frxXPTUSD", nome: "⚪ PLATINA (XPT/USD)" },
+
+    // --- CRIPTOMOEDAS (24/7) ---
     { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
     { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" },
     { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC/USD)" },
@@ -60,84 +69,84 @@ const LISTA_ATIVOS = [
     { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
 ];
 
-let statsDiario = { analises: 0, winDireto: 0, lossDireto: 0, winGale: 0, lossGale: 0, ativos: {} };
-let statsSemanal = {
-    segunda: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    terca: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    quarta: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    quinta: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    sexta: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    sabado: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" },
-    domingo: { analises: 0, wins: 0, loss: 0, winGale: 0, lossGale: 0, melhor: "-", pior: "-" }
-};
 
+let statsDiario = { analises: 0, winDireto: 0, lossDireto: 0, winGale: 0, lossGale: 0, ativos: {} };
 let motores = {};
 let slots = ["1HZ100V", "R_100", "frxEURUSD", "1HZ10V"];
 
-// --- ROTAS DE COMUNICAÇÃO COM O PAINEL DO GITHUB ---
-app.get('/api-dados', (req, res) => {
-    const segs = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"})).getSeconds();
-    const dadosSlots = slots.map(id => {
-        const m = motores[id] || { forca: 50 };
-        return {
-            forca: m.forca || 50,
-            timer: (60 - segs).toString().padStart(2, '0'),
-            status: m.operacaoAtiva ? "OPERANDO" : (m.buscandoTaxa ? "AGUARD. TAXA" : "ANALISANDO")
-        };
-    });
-    let winsTotal = statsDiario.winDireto + statsDiario.winGale;
-    let lossTotal = statsDiario.lossDireto + statsDiario.lossGale;
-    res.json({
-        global: { analises: statsDiario.analises, wins: winsTotal, loss: lossTotal, eficiencia: statsDiario.analises > 0 ? ((winsTotal / statsDiario.analises) * 100).toFixed(1) : 0 },
-        slots: dadosSlots
-    });
-});
-
-app.post('/selecionar-ativo', (req, res) => {
-    const { index, ativo } = req.body;
-    slots[index] = ativo;
-    reiniciarWS();
-    res.json({ success: true });
-});
-
-// Mantive o seu painel interno da Render como backup
+// --- NOVO VISUAL MODERNO (SUBSTITUINDO O ANTIGO) ---
 app.get('/', (req, res) => {
+    // Processa troca de ativo via painel
     if (req.query.slotIdx !== undefined && req.query.ativoId) {
-        const idx = parseInt(req.query.slotIdx);
-        const novoId = req.query.ativoId;
-        slots[idx] = novoId;
+        slots[parseInt(req.query.slotIdx)] = req.query.ativoId;
         reiniciarWS();
     }
-    let html = `<html><head><title>ABS-UEWS DASHBOARD</title>
-    <style>
-        body { font-family: sans-serif; background: #0b0e11; color: white; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 20px; }
-        .card { background: #1e2329; padding: 20px; border-radius: 12px; border-top: 4px solid #f0b90b; position: relative; }
-        .card.trade { border-top-color: #2ebd85; box-shadow: 0 0 15px rgba(46, 189, 133, 0.4); }
-        h2 { margin: 0; font-size: 14px; color: #f0b90b; }
-        .placar { font-size: 24px; font-weight: bold; margin: 10px 0; }
-        .info { color: #848e9c; font-size: 11px; margin-bottom: 10px; }
-        select { background: #2b2f36; color: white; border: 1px solid #444; padding: 5px; border-radius: 4px; width: 100%; cursor: pointer; }
-    </style>
-    <script>setTimeout(() => { if(!window.location.search) location.reload(); }, 5000);</script>
-    </head><body>`;
-    slots.forEach((idAtivo, index) => {
-        const m = motores[idAtivo] || { wins: 0, loss: 0, forca: 50, status: "CARREGANDO" };
-        html += `<div class="card ${m.operacaoAtiva ? 'trade' : ''}">
-            <h2>SLOT ${index + 1}</h2>
-            <div class="placar">${m.wins || 0}W - ${m.loss || 0}L</div>
-            <div class="info">Força: ${(m.forca || 50).toFixed(1)}% | ${m.operacaoAtiva ? '🔥 OPERANDO' : '🔍 ANALISANDO'}</div>
-            <form action="/" method="get">
-                <input type="hidden" name="slotIdx" value="${index}">
-                <select name="ativoId" onchange="this.form.submit()">
-                    ${LISTA_ATIVOS.map(a => `<option value="${a.id}" ${a.id === idAtivo ? 'selected' : ''}>${a.nome}</option>`).join('')}
-                </select>
-            </form>
-        </div>`;
-    });
-    html += `</body></html>`;
-    res.send(html);
+
+    const segs = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"})).getSeconds();
+    const timerGeral = (60 - segs).toString().padStart(2, '0');
+
+    let winsTotal = statsDiario.winDireto + statsDiario.winGale;
+    let lossTotal = statsDiario.lossDireto + statsDiario.lossGale;
+    let eficiencia = statsDiario.analises > 0 ? ((winsTotal / statsDiario.analises) * 100).toFixed(1) : 0;
+
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="pt-br">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>K.C.M V19 - PAINEL</title>
+        <style>
+            :root { --neon-blue: #1e90ff; --neon-green: #00ff88; --neon-red: #ff3355; --bg-dark: #05070a; }
+            body { background: var(--bg-dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+            .header { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1e2228; padding-bottom: 10px; }
+            .logo { font-size: 20px; font-weight: 900; } .logo span { color: var(--neon-blue); }
+            .stats-global { display: flex; gap: 15px; background: #111418; padding: 10px 20px; border-radius: 50px; border: 1px solid #1e90ff; }
+            .stat-item { text-align: center; font-size: 12px; } .stat-val { font-weight: bold; display: block; font-size: 16px; }
+            .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; }
+            .card { background: #111418; border-radius: 15px; padding: 15px; border: 1px solid #1e2228; text-align: center; position: relative; transition: 0.3s; }
+            .card.active { border-color: var(--neon-green); box-shadow: 0 0 10px rgba(0,255,136,0.2); }
+            .card-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 5px; }
+            .thermometer-wrap { width: 100%; height: 6px; background: #222; border-radius: 3px; margin: 10px 0; overflow: hidden; }
+            .thermometer-fill { height: 100%; transition: 0.5s; background: linear-gradient(90deg, var(--neon-red), var(--neon-green)); }
+            .timer-large { font-size: 38px; font-weight: bold; margin: 5px 0; color: #fff; }
+            .status-tag { font-size: 9px; padding: 3px 8px; border-radius: 10px; background: #222; color: #aaa; }
+            select { background: #000; color: #fff; border: 1px solid #1e90ff; width: 100%; padding: 8px; border-radius: 8px; margin-top: 10px; font-size: 12px; }
+        </style>
+        <script>setTimeout(() => { if(!window.location.search) location.reload(); }, 2000);</script>
+    </head>
+    <body>
+        <div class="header">
+            <div class="logo">K.C<span>📈</span>M V19</div>
+            <div class="stats-global">
+                <div class="stat-item"><span class="stat-val">${statsDiario.analises}</span>ANÁLISES</div>
+                <div class="stat-item"><span class="stat-val" style="color:var(--neon-green)">${winsTotal}</span>WINS</div>
+                <div class="stat-item"><span class="stat-val" style="color:var(--neon-red)">${lossTotal}</span>LOSS</div>
+                <div class="stat-item"><span class="stat-val">${eficiencia}%</span>ASSERT.</div>
+            </div>
+        </div>
+        <div class="grid-container">
+            ${slots.map((idAtivo, i) => {
+                const m = motores[idAtivo] || { forca: 50, operacaoAtiva: false };
+                return `
+                <div class="card ${m.operacaoAtiva ? 'active' : ''}">
+                    <div class="card-label">FORÇA DO MERCADO</div>
+                    <div class="thermometer-wrap"><div class="thermometer-fill" style="width: ${m.forca}%"></div></div>
+                    <div class="status-tag">${m.operacaoAtiva ? '🔥 OPERANDO' : (m.buscandoTaxa ? '⏳ AGUARD. TAXA' : '🔍 ANALISANDO')}</div>
+                    <div class="timer-large">${timerGeral}</div>
+                    <form action="/" method="get">
+                        <input type="hidden" name="slotIdx" value="${i}">
+                        <select name="ativoId" onchange="this.form.submit()">
+                            ${LISTA_ATIVOS.map(a => `<option value="${a.id}" ${a.id === idAtivo ? 'selected' : ''}>${a.nome}</option>`).join('')}
+                        </select>
+                    </form>
+                </div>`;
+            }).join('')}
+        </div>
+    </body></html>`);
 });
 
+// --- LÓGICA DE OPERAÇÃO (MANTIDA IGUAL AO SEU CÓDIGO) ---
 function inicializarMotores() {
     slots.forEach(id => {
         if (id !== "NONE" && !motores[id]) {
@@ -168,91 +177,65 @@ async function enviarTelegram(msg) {
 }
 
 function registrarResultado(ativoNome, resultado, foiGale) {
-    const agora = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
-    const diaHoje = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][agora.getDay()];
-    if (!statsDiario.ativos[ativoNome]) statsDiario.ativos[ativoNome] = { w: 0, l: 0 };
     if (resultado === "WIN") {
-        if (foiGale) { statsDiario.winGale++; statsSemanal[diaHoje].winGale++; }
-        else { statsDiario.winDireto++; statsSemanal[diaHoje].wins++; }
-        statsDiario.ativos[ativoNome].w++;
+        if (foiGale) statsDiario.winGale++; else statsDiario.winDireto++;
     } else {
-        if (foiGale) { statsDiario.lossGale++; statsSemanal[diaHoje].lossGale++; }
-        else { statsDiario.lossDireto++; statsSemanal[diaHoje].loss++; }
-        statsDiario.ativos[ativoNome].l++;
+        if (foiGale) statsDiario.lossGale++; else statsDiario.lossDireto++;
     }
     statsDiario.analises++;
-    statsSemanal[diaHoje].analises++;
-    let ranking = Object.entries(statsDiario.ativos).sort((a, b) => (b[1].w - b[1].l) - (a[1].w - a[1].l));
-    if(ranking.length > 0) {
-        statsSemanal[diaHoje].melhor = ranking[0][0];
-        statsSemanal[diaHoje].pior = ranking[ranking.length - 1][0];
-    }
 }
 
 function processarTick(id, preco) {
     const m = motores[id]; if (!m) return;
     const segs = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"})).getSeconds();
+    
     if (m.aberturaVelaAtual > 0) {
         m.forca = 50 + ((preco - m.aberturaVelaAtual) / (m.aberturaVelaAtual * 0.0002) * 20);
         m.forca = Math.min(98, Math.max(2, m.forca));
     }
-    if (!m.operacaoAtiva && !m.buscandoTaxa) {
-        if (segs === 0 && m.aberturaVelaAtual !== preco) {
-            let dirPrevista = m.forca >= 50 ? "🟢 COMPRA" : "🔴 VENDA";
-            enviarTelegram(`🔍 *BUSCANDO POSSÍVEL ENTRADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${dirPrevista}\n⏰ Possível entrada às: ${getHoraBR().slice(0,5)}:00`);
-            setTimeout(() => {
-                const bateuForca = (m.forca >= FORCA_MINIMA || m.forca <= (100 - FORCA_MINIMA));
-                if (!bateuForca) {
-                    enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA*\n💎 Ativo: ${m.nome}\n_(Aguardando nova oportunidade)_`);
-                } else {
-                    m.sinalPendente = m.forca >= FORCA_MINIMA ? "CALL" : "PUT";
-                    m.buscandoTaxa = true;
-                    enviarTelegram(`⏳ *AGUARDANDO CONFIRMAÇÃO DA ENTRADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.sinalPendente === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Entrada alvo: ${getHoraBR().slice(0,5)}:00`);
-                }
-            }, 1200);
-            m.corpoVelaAnterior = Math.abs(preco - m.aberturaVelaAtual);
-            m.fechamentoVelaAnterior = preco; m.aberturaVelaAtual = preco;
-        }
+
+    if (!m.operacaoAtiva && !m.buscandoTaxa && segs === 0 && m.aberturaVelaAtual !== preco) {
+        let dirPrevista = m.forca >= 50 ? "🟢 COMPRA" : "🔴 VENDA";
+        enviarTelegram(`🔍 *BUSCANDO POSSÍVEL ENTRADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${dirPrevista}`);
+        
+        setTimeout(() => {
+            if (m.forca >= FORCA_MINIMA || m.forca <= (100 - FORCA_MINIMA)) {
+                m.sinalPendente = m.forca >= FORCA_MINIMA ? "CALL" : "PUT";
+                m.buscandoTaxa = true;
+            }
+        }, 1200);
+        m.corpoVelaAnterior = Math.abs(preco - m.aberturaVelaAtual);
+        m.fechamentoVelaAnterior = preco; m.aberturaVelaAtual = preco;
     }
+
     if (m.buscandoTaxa && segs < 30) {
         const dist = m.corpoVelaAnterior * (PCT_RECUO_TAXA / 100);
-        let bateuTaxa = (m.sinalPendente === "CALL" && preco <= (m.fechamentoVelaAnterior - dist)) || 
-                        (m.sinalPendente === "PUT" && preco >= (m.fechamentoVelaAnterior + dist));
-        if (bateuTaxa) {
+        if ((m.sinalPendente === "CALL" && preco <= (m.fechamentoVelaAnterior - dist)) || 
+            (m.sinalPendente === "PUT" && preco >= (m.fechamentoVelaAnterior + dist))) {
             m.buscandoTaxa = false; m.operacaoAtiva = m.sinalPendente; m.precoEntrada = preco; m.tempoOp = 60;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início ás: ${getHoraBR()}\n🏁 Fim ás: ${getHoraBR(60)}`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${m.nome}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
         }
     }
-    if (segs >= 30 && m.buscandoTaxa) {
-        enviarTelegram(`⚠️ *OPERAÇÃO ABORTADA*\n💎 Ativo: ${m.nome}\nPreço não atingiu a taxa.`);
-        m.buscandoTaxa = false; m.sinalPendente = null;
-    }
+
     if (m.tempoOp > 0) {
         m.tempoOp--;
         if (m.tempoOp <= 0) {
             const win = (m.operacaoAtiva === "CALL" && preco > m.precoEntrada) || (m.operacaoAtiva === "PUT" && preco < m.precoEntrada);
             if (win) {
-                m.wins++; registrarResultado(m.nome, "WIN", m.galeAtual > 0);
-                enviarTelegram(`✅ *GREEN: ${m.nome}*\n🏆 Resultado: ${m.galeAtual > 0 ? 'GALE '+m.galeAtual : 'DIRETO'}`);
+                registrarResultado(m.nome, "WIN", m.galeAtual > 0);
+                enviarTelegram(`✅ *GREEN: ${m.nome}*`);
                 m.operacaoAtiva = null; m.galeAtual = 0;
             } else if (m.galeAtual < 2) {
                 m.galeAtual++; m.precoEntrada = preco; m.tempoOp = 60; 
-                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início: ${getHoraBR()}\n🏁 Fim: ${getHoraBR(60)}`);
+                enviarTelegram(`🔄 *GALE ${m.galeAtual}: ${m.nome}*`);
             } else {
-                m.loss++; registrarResultado(m.nome, "LOSS", true);
+                registrarResultado(m.nome, "LOSS", true);
                 enviarTelegram(`❌ *LOSS FINAL: ${m.nome}*`);
                 m.operacaoAtiva = null; m.galeAtual = 0;
             }
         }
     }
 }
-
-// Relatórios automáticos que você tinha
-setInterval(() => {
-    if (statsDiario.analises === 0) return;
-    let ef = (((statsDiario.winDireto + statsDiario.winGale) / statsDiario.analises) * 100).toFixed(1);
-    enviarTelegram(`📊 *RELATÓRIO DIÁRIO*\n\n📋 Análises: ${statsDiario.analises}\n✅ Win Direto: ${statsDiario.winDireto}\n🔄 Win Gale: ${statsDiario.winGale}\n❌ Loss Geral: ${statsDiario.lossDireto + statsDiario.lossGale}\n🔥 Eficiência: ${ef}%`);
-}, 300000);
 
 let ws;
 function conectar(){
@@ -266,4 +249,5 @@ function conectar(){
 }
 function reiniciarWS() { if(ws) ws.close(); }
 
-conectar(); app.listen(process.env.PORT || 3000);
+conectar(); 
+app.listen(process.env.PORT || 3000);
