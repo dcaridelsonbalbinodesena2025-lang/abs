@@ -38,16 +38,45 @@
     const URL_RENDER = "https://abs-uews.onrender.com";
 
     const ATIVOS = [
-        {id: "1HZ10V", nome: "Volatility 10 (1s)"},
-        {id: "1HZ25V", nome: "Volatility 25 (1s)"},
-        {id: "1HZ50V", nome: "Volatility 50 (1s)"},
-        {id: "1HZ75V", nome: "Volatility 75 (1s)"},
-        {id: "1HZ100V", nome: "Volatility 100 (1s)"},
-        {id: "R_100", nome: "Volatility 100"},
-        {id: "ST50", nome: "Step Index"},
-        {id: "frxEURUSD", nome: "EUR/USD"},
-        {id: "NONE", nome: "❌ DESATIVADO"}
-    ];
+    { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+    { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+    { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+    { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+    { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+    { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
+    { id: "R_10", nome: "📊 Volatility 10" },
+    { id: "R_25", nome: "📊 Volatility 25" },
+    { id: "R_50", nome: "📊 Volatility 50" },
+    { id: "R_75", nome: "📊 Volatility 75" },
+    { id: "R_100", nome: "📊 Volatility 100" },
+    { id: "JD10", nome: "🚀 Jump 10" },
+    { id: "JD25", nome: "🚀 Jump 25" },
+    { id: "JD50", nome: "🚀 Jump 50" },
+    { id: "JD75", nome: "🚀 Jump 75" },
+    { id: "JD100", nome: "🚀 Jump 100" },
+    { id: "BOOM300", nome: "💥 Boom 300" },
+    { id: "BOOM500", nome: "💥 Boom 500" },
+    { id: "BOOM1000", nome: "💥 Boom 1000" },
+    { id: "CRASH300", nome: "📉 Crash 300" },
+    { id: "CRASH500", nome: "📉 Crash 500" },
+    { id: "CRASH1000", nome: "📉 Crash 1000" },
+    { id: "ST50", nome: "🎢 Step Index" },
+    { id: "frxEURUSD", nome: "💱 EUR/USD" },
+    { id: "frxGBPUSD", nome: "💱 GBP/USD" },
+    { id: "frxUSDJPY", nome: "💱 USD/JPY" },
+    { id: "frxAUDUSD", nome: "💱 AUD/USD" },
+    { id: "frxUSDCAD", nome: "💱 USD/CAD" },
+    { id: "frxUSDCHF", nome: "💱 USD/CHF" },
+    { id: "frxEURGBP", nome: "💱 EUR/GBP" },
+    { id: "frxEURJPY", nome: "💱 EUR/JPY" },
+    { id: "frxGBPJPY", nome: "💱 GBP/JPY" },
+    { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+    { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
+    { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
+    { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" },
+    { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC/USD)" },
+    { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP/USD)" }
+];
 
     async function mudar(index, ativo) {
         try {
