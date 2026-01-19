@@ -11,59 +11,15 @@ const LINK_CORRETORA = "https://track.deriv.com/_S_W1N_";
 const FORCA_MINIMA = 70; 
 const PCT_RECUO_TAXA = 30; 
 
-// --- LISTA DE ATIVOS COMPLETA E ATUALIZADA (SINTÉTICOS, FOREX, METAIS E CRIPTO) ---
 const LISTA_ATIVOS = [
-    { id: "NONE", nome: "❌ DESATIVAR SLOT" },
-    
-    // --- ÍNDICES SINTÉTICOS (24/7 - OS MELHORES PARA O ROBÔ) ---
     { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
     { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
     { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
     { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
     { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
-    { id: "R_10", nome: "📊 Volatility 10" },
-    { id: "R_25", nome: "📊 Volatility 25" },
-    { id: "R_50", nome: "📊 Volatility 50" },
-    { id: "R_75", nome: "📊 Volatility 75" },
     { id: "R_100", nome: "📊 Volatility 100" },
-    { id: "JD10", nome: "🚀 Jump 10" },
-    { id: "JD25", nome: "🚀 Jump 25" },
-    { id: "JD50", nome: "🚀 Jump 50" },
-    { id: "JD75", nome: "🚀 Jump 75" },
-    { id: "JD100", nome: "🚀 Jump 100" },
-    { id: "BOOM300", nome: "💥 Boom 300" },
-    { id: "BOOM500", nome: "💥 Boom 500" },
-    { id: "BOOM1000", nome: "💥 Boom 1000" },
-    { id: "CRASH300", nome: "📉 Crash 300" },
-    { id: "CRASH500", nome: "📉 Crash 500" },
-    { id: "CRASH1000", nome: "📉 Crash 1000" },
     { id: "ST50", nome: "🎢 Step Index" },
-
-    // --- FOREX (PARES MAIORES - SEGUNDA A SEXTA) ---
-    { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
-    { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
-    { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
-    { id: "frxAUDUSD", nome: "💱 AUD/USD (Dólar Aus./Dólar)" },
-    { id: "frxUSDCAD", nome: "💱 USD/CAD (Dólar/Dólar Can.)" },
-    { id: "frxUSDCHF", nome: "💱 USD/CHF (Dólar/Franco Suíço)" },
-    { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
-    { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
-    { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
-
-    // --- METAIS E ENERGIA (COMMODITIES) ---
-    { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
-    { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
-    { id: "frxXPDUSD", nome: "🧪 PALÁDIO (XPD/USD)" },
-    { id: "frxXPTUSD", nome: "⚪ PLATINA (XPT/USD)" },
-
-    // --- CRIPTOMOEDAS (24/7) ---
-    { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
-    { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" },
-    { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC/USD)" },
-    { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP/USD)" },
-    { id: "cryBCHUSD", nome: "₿ BITCOIN CASH (BCH/USD)" },
-    { id: "cryEOSUSD", nome: "🌐 EOS (EOS/USD)" },
-    { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
+    { id: "frxEURUSD", nome: "💱 EUR/USD" }
 ];
 
 // --- BANCO DE DADOS (DIÁRIO E SEMANAL) ---
@@ -105,7 +61,7 @@ async function enviarTelegram(msg) {
     const payload = {
         chat_id: TG_CHAT_ID, text: msg, parse_mode: "Markdown",
         disable_web_page_preview: true, // DIMINUI BALÃO EM 50%
-        reply_markup: { inline_keyboard: { text: "📲 DERIV.COM", url: LINK_CORRETORA } }
+        reply_markup: { inline_keyboard: [[{ text: "📲 DERIV.COM", url: LINK_CORRETORA }]] }
     };
     try { await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, payload); } catch (e) {}
 }
@@ -177,7 +133,7 @@ function processarTick(id, preco) {
             m.operacaoAtiva = m.sinalPendente; 
             m.precoEntrada = preco; 
             m.tempoOp = 60;
-            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n👉 CLIQUE AGORA\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início ás: ${getHoraBR()}\n🏁 Fim ás: ${getHoraBR(60)}`);
+            enviarTelegram(`🚀 *ENTRADA CONFIRMADA*\n💎 Ativo: ${m.nome}\n🎯 Direção: ${m.operacaoAtiva === "CALL" ? "🟢 COMPRA" : "🔴 VENDA"}\n⏰ Início ás: ${getHoraBR()}\n🏁 Fim ás: ${getHoraBR(60)}`);
         }
     }
 
